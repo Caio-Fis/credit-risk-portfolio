@@ -1,9 +1,9 @@
-"""Ingestão do dataset Home Credit Default Risk via Kaggle API.
+"""Home Credit Default Risk dataset ingestion via Kaggle API.
 
-Funções principais:
-- download_home_credit: baixa e extrai os arquivos do Kaggle
-- validate_schema: verifica presença de colunas obrigatórias
-- partition_by_date: particiona processed/ por ano de referência
+Main functions:
+- download_home_credit: downloads and extracts Kaggle files
+- validate_schema: checks presence of required columns
+- partition_by_date: partitions processed/ by reference year
 """
 
 import zipfile
@@ -16,7 +16,7 @@ from src.config import PROCESSED_DIR, RAW_DIR
 
 KAGGLE_COMPETITION = "home-credit-default-risk"
 
-# Arquivos esperados após o download
+# Expected files after download
 EXPECTED_FILES = [
     "application_train.csv",
     "application_test.csv",
@@ -28,7 +28,7 @@ EXPECTED_FILES = [
     "POS_CASH_balance.csv",
 ]
 
-# Colunas obrigatórias mínimas por arquivo
+# Minimum required columns per file
 REQUIRED_COLUMNS: dict[str, list[str]] = {
     "application_train.csv": ["SK_ID_CURR", "TARGET", "AMT_CREDIT", "AMT_INCOME_TOTAL"],
     "bureau.csv": ["SK_ID_CURR", "SK_ID_BUREAU", "DAYS_CREDIT"],
@@ -44,21 +44,21 @@ REQUIRED_COLUMNS: dict[str, list[str]] = {
 
 
 def download_home_credit(output_dir: Path = RAW_DIR, force: bool = False) -> Path:
-    """Baixa o dataset Home Credit via Kaggle API.
+    """Downloads the Home Credit dataset via Kaggle API.
 
-    Requer ~/.kaggle/kaggle.json com credenciais válidas.
+    Requires ~/.kaggle/kaggle.json with valid credentials.
 
     Args:
-        output_dir: Diretório de destino dos arquivos brutos.
-        force: Se True, baixa novamente mesmo que os arquivos existam.
+        output_dir: Destination directory for raw files.
+        force: If True, re-downloads even if files already exist.
 
     Returns:
-        Path do diretório com os arquivos extraídos.
+        Path to the directory with extracted files.
     """
     target_dir = output_dir / "home_credit"
 
     if not force and target_dir.exists() and any(target_dir.glob("*.csv")):
-        logger.info(f"Dados já existem em {target_dir}. Use force=True para rebaixar.")
+        logger.info(f"Data already exists at {target_dir}. Use force=True to re-download.")
         return target_dir
 
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -66,9 +66,9 @@ def download_home_credit(output_dir: Path = RAW_DIR, force: bool = False) -> Pat
     try:
         import kaggle  # noqa: F401
     except ImportError:
-        raise RuntimeError("Instale kaggle: uv add kaggle")
+        raise RuntimeError("Install kaggle: uv add kaggle")
 
-    logger.info(f"Baixando competição '{KAGGLE_COMPETITION}' para {target_dir}...")
+    logger.info(f"Downloading competition '{KAGGLE_COMPETITION}' to {target_dir}...")
     import subprocess
 
     result = subprocess.run(
@@ -87,64 +87,64 @@ def download_home_credit(output_dir: Path = RAW_DIR, force: bool = False) -> Pat
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"Kaggle download falhou:\n{result.stderr}")
+        raise RuntimeError(f"Kaggle download failed:\n{result.stderr}")
 
-    logger.info("Extraindo arquivos ZIP...")
+    logger.info("Extracting ZIP files...")
     for zip_path in target_dir.glob("*.zip"):
         with zipfile.ZipFile(zip_path, "r") as zf:
             zf.extractall(target_dir)
         zip_path.unlink()
-        logger.debug(f"Extraído: {zip_path.name}")
+        logger.debug(f"Extracted: {zip_path.name}")
 
-    logger.success(f"Download concluído. Arquivos em {target_dir}")
+    logger.success(f"Download complete. Files at {target_dir}")
     return target_dir
 
 
 def validate_schema(data_dir: Path = RAW_DIR / "home_credit") -> bool:
-    """Verifica que os arquivos esperados existem e contêm as colunas mínimas.
+    """Checks that expected files exist and contain the minimum required columns.
 
     Args:
-        data_dir: Diretório com os CSVs do Home Credit.
+        data_dir: Directory with Home Credit CSV files.
 
     Returns:
-        True se tudo válido, levanta ValueError caso contrário.
+        True if everything is valid, raises ValueError otherwise.
     """
     errors: list[str] = []
 
     for filename in EXPECTED_FILES:
         filepath = data_dir / filename
         if not filepath.exists():
-            errors.append(f"Arquivo ausente: {filename}")
+            errors.append(f"Missing file: {filename}")
             continue
 
         if filename in REQUIRED_COLUMNS:
             df_head = pd.read_csv(filepath, nrows=0)
             missing = set(REQUIRED_COLUMNS[filename]) - set(df_head.columns)
             if missing:
-                errors.append(f"{filename}: colunas ausentes {missing}")
+                errors.append(f"{filename}: missing columns {missing}")
 
     if errors:
         for err in errors:
             logger.error(err)
-        raise ValueError(f"Validação falhou com {len(errors)} erro(s). Veja logs.")
+        raise ValueError(f"Validation failed with {len(errors)} error(s). Check logs.")
 
-    logger.success(f"Schema validado — {len(EXPECTED_FILES)} arquivo(s) OK.")
+    logger.success(f"Schema validated — {len(EXPECTED_FILES)} file(s) OK.")
     return True
 
 
 def load_application_train(data_dir: Path = RAW_DIR / "home_credit") -> pd.DataFrame:
-    """Carrega application_train.csv com tipos corretos.
+    """Loads application_train.csv with correct types.
 
     Args:
-        data_dir: Diretório com os CSVs do Home Credit.
+        data_dir: Directory with Home Credit CSV files.
 
     Returns:
-        DataFrame com colunas tipadas.
+        DataFrame with typed columns.
     """
     path = data_dir / "application_train.csv"
-    logger.info(f"Carregando {path.name}...")
+    logger.info(f"Loading {path.name}...")
     df = pd.read_csv(path)
-    logger.info(f"Carregado: {df.shape[0]:,} contratos × {df.shape[1]} colunas")
+    logger.info(f"Loaded: {df.shape[0]:,} contracts × {df.shape[1]} columns")
     return df
 
 
@@ -153,33 +153,33 @@ def partition_by_date(
     date_col: str = "DAYS_BIRTH",
     output_dir: Path = PROCESSED_DIR,
 ) -> None:
-    """Salva o DataFrame particionado em parquet por ano aproximado.
+    """Saves the DataFrame partitioned into parquet by approximate year.
 
-    Home Credit não tem data absoluta — usa DAYS_BIRTH como proxy de ordenação
-    para simular particionamento temporal.
+    Home Credit has no absolute date — uses DAYS_BIRTH as an ordering proxy
+    to simulate temporal partitioning.
 
     Args:
-        df: DataFrame a particionar.
-        date_col: Coluna de referência temporal.
-        output_dir: Diretório raiz de saída.
+        df: DataFrame to partition.
+        date_col: Reference temporal column.
+        output_dir: Root output directory.
     """
     if date_col not in df.columns:
-        logger.warning(f"Coluna {date_col} não encontrada. Salvando sem partição.")
+        logger.warning(f"Column {date_col} not found. Saving without partition.")
         out = output_dir / "application_train.parquet"
         df.to_parquet(out, index=False)
-        logger.info(f"Salvo em {out}")
+        logger.info(f"Saved to {out}")
         return
 
-    # Converte DAYS_BIRTH em anos negativos → bins de 10 anos
+    # Converts DAYS_BIRTH (negative years) → 5 bins
     df = df.copy()
     df["_year_bin"] = pd.cut(df[date_col], bins=5, labels=False)
 
     for bin_id, group in df.groupby("_year_bin"):
         out_path = output_dir / f"application_train_bin{int(bin_id)}.parquet"
         group.drop(columns=["_year_bin"]).to_parquet(out_path, index=False)
-        logger.debug(f"Partição {bin_id}: {len(group):,} registros → {out_path.name}")
+        logger.debug(f"Partition {bin_id}: {len(group):,} records → {out_path.name}")
 
-    logger.success(f"Particionamento concluído. Arquivos em {output_dir}")
+    logger.success(f"Partitioning complete. Files at {output_dir}")
 
 
 if __name__ == "__main__":

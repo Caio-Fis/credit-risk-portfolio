@@ -1,13 +1,13 @@
-"""Detecção e reporte de drift de dados.
+"""Data drift detection and reporting.
 
-Separa dois tipos de deterioração:
-1. Drift de população: mudança na distribuição das features (PSI)
-2. Drift de modelo: degradação de métricas (AUROC, KS)
+Separates two types of deterioration:
+1. Population drift: change in feature distributions (PSI)
+2. Model drift: metric degradation (AUROC, KS)
 
-Funções principais:
-- detect_drift: classifica status de uma série de PSI
-- drift_report: relatório completo de drift para um período
-- plot_psi_heatmap: mapa de calor de PSI por feature e período
+Main functions:
+- detect_drift: classifies drift status for a PSI series
+- drift_report: full drift report for a period
+- plot_psi_heatmap: PSI heatmap by feature and period
 """
 
 from pathlib import Path
@@ -21,13 +21,13 @@ from src.monitoring.psi import psi_all_features
 
 
 def detect_drift(psi_series: pd.Series) -> pd.Series:
-    """Classifica o status de drift para uma série de PSI values.
+    """Classifies drift status for a series of PSI values.
 
     Args:
-        psi_series: pd.Series com PSI por feature (índice = feature, valor = PSI).
+        psi_series: pd.Series with PSI per feature (index = feature, value = PSI).
 
     Returns:
-        pd.Series com status: 'stable', 'attention' ou 'drift'.
+        pd.Series with status: 'stable', 'attention' or 'drift'.
     """
 
     def _classify(v: float) -> str:
@@ -46,16 +46,16 @@ def drift_report(
     period_label: str = "current",
     save_path: Path | None = None,
 ) -> pd.DataFrame:
-    """Gera relatório completo de drift entre duas populações.
+    """Generates full drift report between two populations.
 
     Args:
-        ref_df: DataFrame de referência (treinamento).
-        curr_df: DataFrame atual.
-        period_label: Rótulo do período atual (ex: "2024-Q1").
-        save_path: Se fornecido, salva o relatório em CSV.
+        ref_df: Reference DataFrame (training).
+        curr_df: Current DataFrame.
+        period_label: Label for the current period (e.g.: "2024-Q1").
+        save_path: If provided, saves the report as CSV.
 
     Returns:
-        DataFrame com feature, psi, status, delta_mean, delta_std.
+        DataFrame with feature, psi, status, delta_mean, delta_std.
     """
     psi_df = psi_all_features(ref_df, curr_df)
 
@@ -91,18 +91,18 @@ def drift_report(
     n_stable = (report["status"] == "stable").sum()
 
     logger.info(
-        f"Relatório de drift [{period_label}] — "
-        f"Drift: {n_drift} | Atenção: {n_attention} | Estável: {n_stable}"
+        f"Drift report [{period_label}] — "
+        f"Drift: {n_drift} | Attention: {n_attention} | Stable: {n_stable}"
     )
 
     if n_drift > 0:
         drift_features = report[report["status"] == "drift"]["feature"].tolist()
-        logger.warning(f"Features em drift: {drift_features}")
+        logger.warning(f"Features in drift: {drift_features}")
 
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         report.to_csv(save_path, index=False)
-        logger.info(f"Relatório salvo em {save_path}")
+        logger.info(f"Report saved at {save_path}")
 
     return report
 
@@ -112,15 +112,15 @@ def plot_psi_heatmap(
     top_n: int = 20,
     save_path: Path | None = None,
 ) -> plt.Figure:
-    """Mapa de calor de PSI por feature e período.
+    """PSI heatmap by feature and period.
 
     Args:
-        reports: Lista de (period_label, drift_report_df).
-        top_n: Número de features com maior PSI médio a exibir.
-        save_path: Se fornecido, salva a figura.
+        reports: List of (period_label, drift_report_df).
+        top_n: Number of features with highest mean PSI to display.
+        save_path: If provided, saves the figure.
 
     Returns:
-        Figura matplotlib.
+        Matplotlib figure.
     """
 
     pivot = pd.concat(
@@ -131,7 +131,7 @@ def plot_psi_heatmap(
         axis=1,
     )
 
-    # Seleciona top N por PSI médio
+    # Select top N by mean PSI
     pivot = pivot.loc[pivot.mean(axis=1).nlargest(top_n).index]
 
     fig, ax = plt.subplots(figsize=(max(8, len(reports) * 1.5), max(6, top_n * 0.4)))
@@ -143,19 +143,19 @@ def plot_psi_heatmap(
     ax.set_yticks(range(len(pivot.index)))
     ax.set_yticklabels(pivot.index, fontsize=8)
 
-    # Linhas de threshold
+    # Threshold lines
     for threshold, color, label in [
-        (PSI_STABLE, "green", f"Estável (<{PSI_STABLE})"),
-        (PSI_ATTENTION, "orange", f"Atenção (<{PSI_ATTENTION})"),
+        (PSI_STABLE, "green", f"Stable (<{PSI_STABLE})"),
+        (PSI_ATTENTION, "orange", f"Attention (<{PSI_ATTENTION})"),
     ]:
-        pass  # linhas seriam no colorbar — mantém simples
+        pass  # lines would be on the colorbar — keeping it simple
 
-    ax.set_title("PSI por Feature e Período")
+    ax.set_title("PSI by Feature and Period")
     plt.tight_layout()
 
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
-        logger.info(f"PSI heatmap salvo em {save_path}")
+        logger.info(f"PSI heatmap saved at {save_path}")
 
     return fig

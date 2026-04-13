@@ -1,67 +1,67 @@
-# Credit Risk Portfolio — Pipeline end-to-end para crédito PJ
+# Credit Risk Portfolio — End-to-end pipeline for SME credit risk
 
-## O problema
+## The problem
 
-Instituições financeiras que operam crédito para micro e pequenas empresas enfrentam um paradoxo: precisam decidir limite, prazo e taxa no momento da concessão, mas os dados mais relevantes sobre o tomador — comportamento de pagamento, sazonalidade, dependência de clientes — só aparecem meses depois.
+Financial institutions that operate credit for micro and small businesses face a paradox: they must decide credit limit, tenor, and rate at origination, but the most relevant data about the borrower — payment behavior, seasonality, customer concentration — only surfaces months later.
 
-O modelo de score único agrava o problema ao colapsar toda essa complexidade num número entre 0 e 1000 que ignora o contexto da operação. Um score 650 pode ser adequado para capital de giro de 30 dias e completamente inadequado para um investimento de 48 meses. O mesmo CNPJ, riscos radicalmente diferentes.
+The single-score model compounds the problem by collapsing all this complexity into a number between 0 and 1000 that ignores the operation's context. A score of 650 may be adequate for 30-day working capital and completely inadequate for a 48-month investment loan. Same CNPJ, radically different risks.
 
-Este projeto demonstra uma arquitetura alternativa: modelos separados de PD e LGD, enriquecimento com dados macroeconômicos, score contextual por produto e prazo, e monitoramento contínuo de drift — tudo com explicabilidade por contrato.
-
----
-
-## A solução
-
-Pipeline end-to-end que transforma dados cadastrais, transacionais e macroeconômicos em:
-
-- **Probabilidade de default calibrada** (PD) — não apenas ranking, mas probabilidade em escala real
-- **Estimativa de perda dado default** (LGD) — quanto se perde se o default ocorrer
-- **Expected loss por contrato** — EL = PD × LGD × EAD, em reais
-- **Score contextual por produto e prazo** — o mesmo cliente avaliado diferente para produtos diferentes
-- **Monitoramento de drift** — alertas automáticos quando a distribuição dos dados muda
+This project demonstrates an alternative architecture: separate PD and LGD models, enrichment with macroeconomic data, contextual scoring by product and tenor, and continuous drift monitoring — all with per-contract explainability.
 
 ---
 
-## Estrutura do projeto
+## The solution
+
+End-to-end pipeline that transforms registration, transactional, and macroeconomic data into:
+
+- **Calibrated probability of default** (PD) — not just ranking, but probability on a real scale
+- **Loss given default estimate** (LGD) — how much is lost if default occurs
+- **Expected loss per contract** — EL = PD × LGD × EAD, in currency units
+- **Contextual score by product and tenor** — the same client assessed differently for different products
+- **Drift monitoring** — automatic alerts when the data distribution shifts
+
+---
+
+## Project structure
 
 ```
 credit-risk-portfolio/
 │
-├── README.md                        ← você está aqui
-├── pyproject.toml                   ← dependências versionadas
+├── README.md                        ← you are here
+├── pyproject.toml                   ← versioned dependencies
 ├── Makefile                         ← make pipeline | make app | make test
-├── .github/workflows/ci.yml         ← testes automáticos em cada push
+├── .github/workflows/ci.yml         ← automated tests on each push
 │
 ├── data/
-│   ├── raw/                         ← .gitignore — não versionado
-│   ├── processed/                   ← features prontas para treino
-│   └── schemas/                     ← contratos de dado versionados
+│   ├── raw/                         ← .gitignore — not versioned
+│   ├── processed/                   ← features ready for training
+│   └── schemas/                     ← versioned data contracts
 │
 ├── src/
-│   ├── ingestion/                   ← download, validação de schema, particionamento
+│   ├── ingestion/                   ← download, schema validation, partitioning
 │   ├── features/
-│   │   ├── build_features.py        ← feature store batch (janelas 30/90/365d)
-│   │   └── macro_features.py        ← enriquecimento com séries do BCB
+│   │   ├── build_features.py        ← batch feature store (30/90/365d windows)
+│   │   └── macro_features.py        ← enrichment with BCB time series
 │   ├── models/
-│   │   ├── pd_model.py              ← LightGBM + calibração de Platt
-│   │   ├── lgd_model.py             ← regressão Beta / Tobit
+│   │   ├── pd_model.py              ← LightGBM + isotonic calibration
+│   │   ├── lgd_model.py             ← Beta / Tobit regression
 │   │   └── expected_loss.py         ← EL = PD × LGD × EAD
-│   ├── explain/                     ← SHAP values, waterfall por contrato
+│   ├── explain/                     ← SHAP values, waterfall per contract
 │   ├── evaluate/                    ← AUROC, KS, Brier Score, calibration plot
 │   ├── monitoring/
-│   │   ├── psi.py                   ← Population Stability Index por feature
-│   │   ├── drift_detector.py        ← alerta quando PSI > 0.20
-│   │   └── vintage_analysis.py      ← inadimplência por safra e maturidade
+│   │   ├── psi.py                   ← Population Stability Index per feature
+│   │   ├── drift_detector.py        ← alert when PSI > 0.20
+│   │   └── vintage_analysis.py      ← default rate by cohort and maturity
 │   ├── early_warning/
-│   │   ├── score_trajectory.py      ← queda de score > N pts em 30d
-│   │   └── behavioral_signals.py    ← gatilhos: volume transacional, protestos
+│   │   ├── score_trajectory.py      ← score drop > N pts in 30d
+│   │   └── behavioral_signals.py    ← triggers: transaction volume, protests
 │   └── contextual/
-│       ├── data_generator.py        ← dataset sintético com DGP controlado
-│       ├── context_features.py      ← prazo, produto, garantia como features
-│       └── interaction_model.py     ← interações cliente × contexto
+│       ├── data_generator.py        ← synthetic dataset with controlled DGP
+│       ├── context_features.py      ← tenor, product, collateral as features
+│       └── interaction_model.py     ← client × context interactions
 │
 ├── notebooks/
-│   ├── 01_eda.ipynb                 ← exploração + storytelling de negócio
+│   ├── 01_eda.ipynb                 ← exploration + business storytelling
 │   ├── 02_feature_engineering.ipynb
 │   ├── 03_modeling_pd.ipynb
 │   ├── 04_modeling_lgd.ipynb
@@ -69,18 +69,18 @@ credit-risk-portfolio/
 │   ├── 06_vintage_analysis.ipynb
 │   ├── 07_drift_monitoring.ipynb
 │   ├── 08_early_warning.ipynb
-│   ├── 09_synthetic_data.ipynb      ← transparência total do DGP
-│   ├── 10_contextual_score.ipynb    ← mesmo CNPJ, produtos diferentes
-│   └── 11_score_unico_falha.ipynb   ← demonstração quantitativa da limitação
+│   ├── 09_synthetic_data.ipynb      ← full DGP transparency
+│   ├── 10_contextual_score.ipynb    ← same CNPJ, different products
+│   └── 11_score_unico_falha.ipynb   ← quantitative demonstration of single-score limitations
 │
 ├── app/
-│   ├── Home.py                      ← visão geral e narrativa do projeto
+│   ├── Home.py                      ← project overview and narrative
 │   └── pages/
-│       ├── 1_Concessao.py           ← simulador: entrada → score → EL
-│       ├── 2_Portfolio.py           ← dashboard de carteira com KPIs
-│       ├── 3_EarlyWarning.py        ← lista de alertas + trajetória de score
-│       ├── 4_Explicabilidade.py     ← SHAP waterfall interativo por contrato
-│       └── 5_ScoreContextual.py     ← mesmo cliente, produtos diferentes ao vivo
+│       ├── 1_Concessao.py           ← simulator: input → score → EL
+│       ├── 2_Portfolio.py           ← portfolio dashboard with KPIs
+│       ├── 3_EarlyWarning.py        ← alert list + score trajectory
+│       ├── 4_Explicabilidade.py     ← interactive SHAP waterfall per contract
+│       └── 5_ScoreContextual.py     ← same client, different products live
 │
 └── tests/
     ├── test_features.py
@@ -90,121 +90,121 @@ credit-risk-portfolio/
 
 ---
 
-## Módulos
+## Modules
 
-### Módulo 1 — Pipeline end-to-end PD + LGD (core)
+### Module 1 — End-to-end PD + LGD pipeline (core)
 
-**Dataset:** Home Credit Default Risk (Kaggle) enriquecido com séries macroeconômicas do Banco Central do Brasil (Selic, inadimplência setorial, índice de atividade econômica).
+**Dataset:** Home Credit Default Risk (Kaggle) enriched with macroeconomic time series from the Brazilian Central Bank (Selic rate, sectoral default rate, economic activity index).
 
-**O que demonstra:**
-- Engenharia de features sobre múltiplas tabelas relacionais com janelas temporais
-- Feature store documentada e reproduzível
-- Modelo de PD (LightGBM) com calibração de probabilidade via Platt scaling
-- Modelo de LGD separado (regressão Beta) — tratado como problema distinto
-- Cálculo de Expected Loss em valor absoluto por contrato
-- Explicabilidade por SHAP com waterfall individual
+**What it demonstrates:**
+- Feature engineering across multiple relational tables with temporal windows
+- Documented and reproducible feature store
+- PD model (LightGBM) with probability calibration via isotonic regression
+- Separate LGD model (Beta regression) — treated as a distinct problem
+- Expected Loss calculation in absolute currency per contract
+- Per-contract explainability via SHAP waterfall
 
-**Métricas alvo:**
+**Target metrics:**
 - AUROC > 0.78
 - KS > 0.35
 - Brier Score < 0.15
-- Calibration plot dentro de banda de confiança de 95%
+- Calibration plot within 95% confidence band
 
 ---
 
-### Módulo 2 — Early warning e monitoramento de carteira
+### Module 2 — Early warning and portfolio monitoring
 
-**O que demonstra:**
-- Population Stability Index (PSI) automatizado por feature com alertas
-- Análise de safra — inadimplência acumulada por coorte de originação
-- Modelo de early warning baseado em trajetória de score (queda > 50pts em 30d)
-- Gatilhos comportamentais: queda de volume transacional, emissão de NF-e, protestos
-- Separação clara entre deterioração de dado (drift de população) e deterioração de modelo
+**What it demonstrates:**
+- Automated Population Stability Index (PSI) per feature with alerts
+- Vintage analysis — cumulative default rate by origination cohort
+- Early warning model based on score trajectory (drop > 50 pts in 30 days)
+- Behavioral triggers: transaction volume drop, invoice issuance, protests
+- Clear separation between data deterioration (population drift) and model deterioration
 
-**Limites operacionais implementados:**
-- PSI < 0.10 → estável
-- PSI 0.10–0.20 → atenção, investigar
-- PSI > 0.20 → drift confirmado, retreino necessário
-
----
-
-### Módulo 3 — Score contextual (diferencial)
-
-**Dataset:** Sintético com data generating process (DGP) totalmente documentado e controlado.
-
-**O que demonstra:**
-- Por que o mesmo CNPJ tem risco radicalmente diferente para capital de giro de 30 dias vs investimento de 48 meses
-- Como produto, prazo e garantia devem entrar como features — não como filtros de pré-processamento
-- Demonstração quantitativa da limitação do score único: simulação de decisões com score único vs score contextual, com diferença de expected loss calculada
-- O score único não é errado — é insuficiente. Ele vira uma feature entre muitas.
+**Operational thresholds implemented:**
+- PSI < 0.10 → stable
+- PSI 0.10–0.20 → caution, investigate
+- PSI > 0.20 → drift confirmed, retraining required
 
 ---
 
-## Resultados
+### Module 3 — Contextual score (differentiator)
 
-> *Preencher após treino e validação dos modelos.*
+**Dataset:** Synthetic with a fully documented and controlled data generating process (DGP).
 
-| Modelo | AUROC | KS | Brier Score |
-|--------|-------|----|-------------|
-| PD — baseline logística | — | — | — |
-| PD — LightGBM sem calibração | — | — | — |
-| PD — LightGBM + Platt | — | — | — |
-| LGD — regressão Beta | R² = — | — | — |
+**What it demonstrates:**
+- Why the same CNPJ has radically different risk for 30-day working capital vs a 48-month investment loan
+- How product, tenor, and collateral should enter as features — not as pre-processing filters
+- Quantitative demonstration of the single-score limitation: simulation of decisions with single score vs contextual score, with calculated expected loss difference
+- The single score is not wrong — it is insufficient. It becomes one feature among many.
 
 ---
 
-## Como rodar
+## Results
+
+> *Fill in after model training and validation.*
+
+| Model | AUROC | KS | Brier Score |
+|-------|-------|----|-------------|
+| PD — logistic baseline | — | — | — |
+| PD — LightGBM without calibration | — | — | — |
+| PD — LightGBM + isotonic regression | — | — | — |
+| LGD — Beta regression | R² = — | — | — |
+
+---
+
+## How to run
 
 ```bash
-# 1. clonar e instalar
+# 1. clone and install
 git clone https://github.com/seu-usuario/credit-risk-portfolio
 cd credit-risk-portfolio
 pip install -e ".[dev]"
 
-# 2. baixar dados (requer login Kaggle)
+# 2. download data (requires Kaggle login)
 make data
 
-# 3. rodar pipeline completo
+# 3. run full pipeline
 make pipeline
 
-# 4. subir o app
+# 4. start the app
 make app
 ```
 
-> O Makefile encadeia ingestão → features → treino → avaliação → exportação de artefatos.
-> Cada etapa é idempotente: pode ser reexecutada sem efeito colateral.
+> The Makefile chains ingestion → features → training → evaluation → artifact export.
+> Each step is idempotent: can be re-run without side effects.
 
 ---
 
-## Decisões técnicas e trade-offs
+## Technical decisions and trade-offs
 
-**PD e LGD como modelos separados**
-O custo de errar em cada dimensão é diferente. PD alta com LGD baixa (garantia real) tem expected loss menor que PD média com LGD alta (sem garantia). Colapsar tudo num score único perde essa informação no momento da precificação. O trade-off é complexidade operacional — dois modelos para manter, monitorar e retreinar.
+**PD and LGD as separate models**
+The cost of errors in each dimension differs. High PD with low LGD (real collateral) has a lower expected loss than medium PD with high LGD (no collateral). Collapsing everything into a single score loses this information at pricing time. The trade-off is operational complexity — two models to maintain, monitor, and retrain.
 
-**LightGBM com calibração de Platt**
-Gradient boosting produz bom ranking mas probabilidades mal calibradas — o modelo tende a comprimir as probabilidades para longe de 0 e 1. Para calcular EL em reais, você precisa de probabilidade em escala real. O Platt scaling resolve isso com custo computacional mínimo. Alternativa considerada e descartada: isotonic regression (overfita em amostras menores).
+**LightGBM with isotonic calibration**
+Gradient boosting produces good ranking but poorly calibrated probabilities — the model tends to compress probabilities away from 0 and 1. To calculate EL in currency units, you need probability on a real scale. Isotonic regression solves this with minimal computational cost. Alternative considered and discarded: Platt scaling (showed systematic miscalibration on this dataset per Hosmer-Lemeshow tests).
 
-**Home Credit + enriquecimento BCB**
-O dataset Home Credit tem riqueza relacional suficiente para demonstrar feature engineering real. O enriquecimento com BCB simula o que uma empresa real faria: adicionar contexto macroeconômico à decisão individual. Dado de bureau sozinho é insuficiente para prazo longo — a inadimplência de uma MPE em recessão é estruturalmente diferente da mesma MPE em expansão.
+**Home Credit + BCB enrichment**
+The Home Credit dataset has sufficient relational richness to demonstrate real feature engineering. The BCB enrichment simulates what a real company would do: add macroeconomic context to individual decisions. Bureau data alone is insufficient for long tenors — the default rate of an SME in recession is structurally different from the same SME during expansion.
 
-**Dataset sintético no módulo 3**
-Nenhum dataset público permite controlar produto e prazo como variável experimental de forma limpa. O sintético com DGP documentado é mais honesto que tentar extrair esse efeito de dados observacionais onde produto e prazo são correlacionados com o perfil do tomador. A transparência do DGP é parte do argumento — o leitor pode verificar que o efeito não foi fabricado.
+**Synthetic dataset in module 3**
+No public dataset allows controlling product and tenor as a clean experimental variable. The synthetic dataset with a documented DGP is more honest than trying to extract this effect from observational data where product and tenor are correlated with borrower profile. The transparency of the DGP is part of the argument — the reader can verify that the effect was not fabricated.
 
-**Streamlit para o app**
-Trade-off deliberado entre velocidade de entrega e robustez. Para portfólio, Streamlit entrega uma interface interativa deployável em horas. O código do app é mantido separado de `src/` para deixar explícito que é camada de apresentação, não lógica de negócio.
-
----
-
-## Contexto e motivação
-
-Este projeto nasceu de uma pergunta prática: como uma fintech que opera crédito de investimento para MPE deveria construir seu pipeline de risco do zero, sem histórico próprio de inadimplência?
-
-A resposta passa por admitir o que não se sabe (sem histórico próprio, o primeiro modelo é um scorecard de regras, não ML), construir a infraestrutura de coleta desde o dia 1, e separar explicitamente as decisões de negócio das decisões técnicas — porque o custo assimétrico do erro define o threshold, não o modelo.
-
-Os três módulos refletem essa progressão: concessão → monitoramento → crítica ao modelo vigente.
+**Streamlit for the app**
+Deliberate trade-off between delivery speed and robustness. For a portfolio, Streamlit delivers a deployable interactive interface in hours. The app code is kept separate from `src/` to make explicit that it is a presentation layer, not business logic.
 
 ---
 
-## Autor
+## Context and motivation
 
-> *Preencher com nome, LinkedIn, contato.*
+This project was born from a practical question: how should a fintech that operates investment credit for SMEs build its risk pipeline from scratch, without its own default history?
+
+The answer involves admitting what is unknown (without own history, the first model is a rules scorecard, not ML), building the data collection infrastructure from day one, and explicitly separating business decisions from technical decisions — because the asymmetric cost of error defines the threshold, not the model.
+
+The three modules reflect this progression: origination → monitoring → critique of the current model.
+
+---
+
+## Author
+
+> *Fill in with name, LinkedIn, contact.*

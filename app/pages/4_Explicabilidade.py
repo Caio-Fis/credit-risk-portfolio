@@ -1,4 +1,4 @@
-"""Explicabilidade SHAP — waterfall interativo por contrato."""
+"""SHAP Explainability — interactive waterfall per contract."""
 
 import sys
 from pathlib import Path
@@ -12,14 +12,14 @@ from src.contextual.data_generator import generate_dataset
 from src.contextual.interaction_model import train_contextual
 from src.explain.shap_explain import compute_shap, top_features, waterfall_plot
 
-st.set_page_config(page_title="Explicabilidade SHAP", layout="wide")
-st.title("Explicabilidade por SHAP")
+st.set_page_config(page_title="SHAP Explainability", layout="wide")
+st.title("Explainability via SHAP")
 st.caption(
-    "Waterfall interativo: quais features mais influenciaram cada decisão de crédito."
+    "Interactive waterfall: which features most influenced each credit decision."
 )
 
 
-@st.cache_resource(show_spinner="Treinando modelo e calculando SHAP values...")
+@st.cache_resource(show_spinner="Training model and computing SHAP values...")
 def load_model_and_shap():
     df = generate_dataset(n=2000, seed=42)
     model, feature_names = train_contextual(df, seed=42)
@@ -45,15 +45,15 @@ def load_model_and_shap():
 df, X, explanation, feature_names = load_model_and_shap()
 
 # ---------------------------------------------------------------------------
-# Importância global
+# Global importance
 # ---------------------------------------------------------------------------
-st.subheader("Importância Global das Features")
+st.subheader("Global Feature Importance")
 top_feat = top_features(explanation, n=15)
 
 fig, ax = plt.subplots(figsize=(8, 5))
 ax.barh(top_feat["feature"][::-1], top_feat["mean_abs_shap"][::-1], color="steelblue")
-ax.set_xlabel("Importância SHAP média (|SHAP|)")
-ax.set_title("Top 15 Features — Importância Global")
+ax.set_xlabel("Mean SHAP importance (|SHAP|)")
+ax.set_title("Top 15 Features — Global Importance")
 ax.grid(axis="x", alpha=0.3)
 plt.tight_layout()
 st.pyplot(fig)
@@ -61,25 +61,25 @@ st.pyplot(fig)
 st.divider()
 
 # ---------------------------------------------------------------------------
-# Waterfall por contrato
+# Waterfall per contract
 # ---------------------------------------------------------------------------
-st.subheader("Waterfall por Contrato")
+st.subheader("Waterfall per Contract")
 st.caption(
-    "Selecione um contrato para ver como cada feature contribuiu para a decisão."
+    "Select a contract to see how each feature contributed to the credit decision."
 )
 
 idx = st.slider(
-    "Índice do contrato", min_value=0, max_value=min(len(X) - 1, 200), value=0
+    "Contract index", min_value=0, max_value=min(len(X) - 1, 200), value=0
 )
 
 contract_info = df.iloc[idx]
 c1, c2, c3 = st.columns(3)
 with c1:
-    st.metric("Produto", contract_info["product_type"])
+    st.metric("Product", contract_info["product_type"])
 with c2:
-    st.metric("Prazo (meses)", int(contract_info["tenor_months"]))
+    st.metric("Tenor (months)", int(contract_info["tenor_months"]))
 with c3:
-    st.metric("PD real (DGP)", f"{contract_info['pd_true']:.3f}")
+    st.metric("True PD (DGP)", f"{contract_info['pd_true']:.3f}")
 
 fig_wf = waterfall_plot(explanation, idx=idx, max_display=12)
 st.pyplot(fig_wf)

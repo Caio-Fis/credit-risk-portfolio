@@ -1,4 +1,4 @@
-"""Early Warning — lista de alertas e trajetória de score."""
+"""Early Warning — alert list and score trajectory."""
 
 import sys
 from pathlib import Path
@@ -20,7 +20,7 @@ from src.early_warning.score_trajectory import (
 
 st.set_page_config(page_title="Early Warning", layout="wide")
 st.title("Early Warning")
-st.caption("Detecção de deterioração de crédito antes do default.")
+st.caption("Credit deterioration detection before default.")
 
 
 @st.cache_data
@@ -38,30 +38,30 @@ df_behavior, trajectory, composite = load_alerts()
 # ---------------------------------------------------------------------------
 # KPIs
 # ---------------------------------------------------------------------------
-st.subheader("Resumo de Alertas")
+st.subheader("Alert Summary")
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    st.metric("Entidades monitoradas", f"{len(trajectory):,}")
+    st.metric("Monitored entities", f"{len(trajectory):,}")
 with c2:
     critico = (composite["composite_risk"] == 3).sum() if not composite.empty else 0
     st.metric(
-        "Críticos", critico, delta=f"-{critico} vs mês anterior" if critico else None
+        "Critical", critico, delta=f"-{critico} vs prior month" if critico else None
     )
 with c3:
     alto = (composite["composite_risk"] == 2).sum() if not composite.empty else 0
-    st.metric("Alto risco", alto)
+    st.metric("High risk", alto)
 with c4:
     moderado = (composite["composite_risk"] == 1).sum() if not composite.empty else 0
-    st.metric("Moderado", moderado)
+    st.metric("Moderate", moderado)
 
 st.divider()
 
 # ---------------------------------------------------------------------------
-# Tabela de alertas
+# Alert table
 # ---------------------------------------------------------------------------
-st.subheader("Empresas em Alerta")
+st.subheader("Entities in Alert")
 if composite.empty:
-    st.info("Nenhum alerta ativo no momento.")
+    st.info("No active alerts at this time.")
 else:
     display_cols = [
         c
@@ -83,13 +83,13 @@ else:
 st.divider()
 
 # ---------------------------------------------------------------------------
-# Trajetória de score interativa
+# Interactive score trajectory
 # ---------------------------------------------------------------------------
-st.subheader("Trajetória de Score — Análise Individual")
+st.subheader("Score Trajectory — Individual Analysis")
 
 if not composite.empty:
     entity_ids = composite["SK_ID_CURR"].head(20).tolist()
-    selected = st.selectbox("Selecione a entidade", options=entity_ids)
+    selected = st.selectbox("Select entity", options=entity_ids)
 
     entity_data = df_behavior[df_behavior["SK_ID_CURR"] == selected].sort_values(
         "reference_date"
@@ -110,11 +110,11 @@ if not composite.empty:
             y=entity_data["pd_score"].iloc[-1],
             line_dash="dash",
             line_color="red",
-            annotation_text="Score atual",
+            annotation_text="Current score",
         )
         fig.update_layout(
-            title=f"Trajetória de Score — Entidade {selected}",
-            xaxis_title="Data",
+            title=f"Score Trajectory — Entity {selected}",
+            xaxis_title="Date",
             yaxis_title="Score (0–1000)",
             yaxis=dict(range=[0, 1000]),
             height=400,
@@ -125,7 +125,7 @@ if not composite.empty:
         if not row.empty:
             drop = float(row["score_drop"].values[0])
             st.metric(
-                "Queda de score nos últimos 30 dias",
+                "Score drop in the last 30 days",
                 f"{drop:.0f} pts",
                 delta=f"-{drop:.0f} pts",
                 delta_color="inverse",

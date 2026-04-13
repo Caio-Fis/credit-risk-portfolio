@@ -1,16 +1,16 @@
-"""Population Stability Index (PSI) por feature.
+"""Population Stability Index (PSI) per feature.
 
-PSI mede o quão diferente é a distribuição atual de uma feature
-em relação à distribuição de referência (treinamento).
+PSI measures how different the current distribution of a feature is
+relative to the reference distribution (training).
 
-Interpretação:
-- PSI < 0.10  → estável (sem ação necessária)
-- PSI 0.10–0.20 → atenção (investigar causa)
-- PSI > 0.20  → drift confirmado (retreino necessário)
+Interpretation:
+- PSI < 0.10  → stable (no action required)
+- PSI 0.10–0.20 → attention (investigate cause)
+- PSI > 0.20  → drift confirmed (retraining required)
 
-Funções principais:
-- compute_psi: PSI para uma única feature
-- psi_all_features: PSI para todas as features numéricas de dois DataFrames
+Main functions:
+- compute_psi: PSI for a single feature
+- psi_all_features: PSI for all numeric features of two DataFrames
 """
 
 import numpy as np
@@ -19,7 +19,7 @@ from loguru import logger
 
 from src.config import PSI_ATTENTION, PSI_STABLE
 
-EPS = 1e-6  # evita log(0)
+EPS = 1e-6  # avoids log(0)
 
 
 def compute_psi(
@@ -27,12 +27,12 @@ def compute_psi(
     actual: np.ndarray | pd.Series,
     bins: int = 10,
 ) -> float:
-    """Calcula PSI entre distribuição esperada e atual.
+    """Calculates PSI between expected and actual distributions.
 
     Args:
-        expected: Distribuição de referência (ex: dados de treinamento).
-        actual: Distribuição atual (ex: dados de produção).
-        bins: Número de bins para discretização.
+        expected: Reference distribution (e.g.: training data).
+        actual: Current distribution (e.g.: production data).
+        bins: Number of bins for discretisation.
 
     Returns:
         PSI score (float >= 0).
@@ -47,18 +47,18 @@ def compute_psi(
     if len(expected_clean) == 0 or len(actual_clean) == 0:
         return 0.0
 
-    # Usa quantis da distribuição de referência para definir os bins
+    # Use quantiles of the reference distribution to define bins
     breakpoints = np.nanpercentile(expected_clean, np.linspace(0, 100, bins + 1))
-    breakpoints = np.unique(breakpoints)  # remove duplicatas (features constantes)
+    breakpoints = np.unique(breakpoints)  # remove duplicates (constant features)
 
     if len(breakpoints) < 2:
         return 0.0
 
-    # Conta frequências por bin
+    # Count frequencies per bin
     expected_counts = np.histogram(expected_clean, bins=breakpoints)[0]
     actual_counts = np.histogram(actual_clean, bins=breakpoints)[0]
 
-    # Converte para proporções (soma = 1)
+    # Convert to proportions (sum = 1)
     expected_pct = (expected_counts / len(expected_clean)).clip(EPS)
     actual_pct = (actual_counts / len(actual_clean)).clip(EPS)
 
@@ -73,16 +73,16 @@ def psi_all_features(
     bins: int = 10,
     numeric_only: bool = True,
 ) -> pd.DataFrame:
-    """Calcula PSI para todas as features e classifica status.
+    """Calculates PSI for all features and classifies status.
 
     Args:
-        ref_df: DataFrame de referência (treinamento).
-        curr_df: DataFrame atual (produção/validação).
-        bins: Número de bins por feature.
-        numeric_only: Se True, processa apenas colunas numéricas.
+        ref_df: Reference DataFrame (training).
+        curr_df: Current DataFrame (production/validation).
+        bins: Number of bins per feature.
+        numeric_only: If True, processes only numeric columns.
 
     Returns:
-        DataFrame com colunas: feature, psi, status (stable/attention/drift).
+        DataFrame with columns: feature, psi, status (stable/attention/drift).
     """
     if numeric_only:
         cols = ref_df.select_dtypes(include=[np.number]).columns.tolist()
@@ -104,14 +104,14 @@ def psi_all_features(
     n_drift = (result["status"] == "drift").sum()
     n_attention = (result["status"] == "attention").sum()
     logger.info(
-        f"PSI calculado — {n_drift} features em drift, {n_attention} em atenção"
+        f"PSI computed — {n_drift} features in drift, {n_attention} under attention"
     )
 
     return result
 
 
 def _classify_psi(psi_val: float) -> str:
-    """Classifica o PSI conforme thresholds operacionais."""
+    """Classifies PSI according to operational thresholds."""
     if psi_val < PSI_STABLE:
         return "stable"
     elif psi_val < PSI_ATTENTION:

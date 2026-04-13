@@ -1,4 +1,4 @@
-"""Configurações globais do projeto: paths, logging e thresholds operacionais."""
+"""Global project configuration: paths, logging, and operational thresholds."""
 
 import sys
 from pathlib import Path
@@ -16,7 +16,7 @@ SCHEMAS_DIR = DATA_DIR / "schemas"
 MODELS_DIR = PROJECT_ROOT / "mlruns"
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 
-# Cria diretórios necessários ao importar config
+# Creates required directories on import
 LOGS_DIR = PROJECT_ROOT / "logs"
 
 for _dir in (RAW_DIR, PROCESSED_DIR, SCHEMAS_DIR, ARTIFACTS_DIR, LOGS_DIR):
@@ -47,29 +47,29 @@ MLFLOW_EXPERIMENT_PD = "pd_model"
 MLFLOW_EXPERIMENT_LGD = "lgd_model"
 
 # ---------------------------------------------------------------------------
-# Thresholds operacionais — nunca hardcodar fora daqui
+# Operational thresholds — never hardcode outside this file
 # ---------------------------------------------------------------------------
 
 # PSI (Population Stability Index)
 PSI_STABLE = 0.10
-PSI_ATTENTION = 0.20  # entre PSI_STABLE e PSI_ATTENTION → atenção
+PSI_ATTENTION = 0.20  # between PSI_STABLE and PSI_ATTENTION → attention
 
-# Early warning: queda de score
-SCORE_DROP_THRESHOLD = 50  # pontos
+# Early warning: score drop
+SCORE_DROP_THRESHOLD = 50  # points
 SCORE_DROP_WINDOW_DAYS = 30
 
-# Score contextual: normalização para escala 0–1000
+# Contextual score: normalisation to 0–1000 scale
 SCORE_MIN = 0
 SCORE_MAX = 1000
 
 # ---------------------------------------------------------------------------
-# Produtos e prazos válidos (Módulo 3)
+# Valid products and tenors (Module 3)
 # ---------------------------------------------------------------------------
 PRODUCTS = ["capital_de_giro", "investimento", "antecipacao_recebiveis"]
 TENORS_MONTHS = [1, 3, 6, 12, 24, 36, 48]
 
 # ---------------------------------------------------------------------------
-# BCB SGS — IDs das séries macroeconômicas
+# BCB SGS — IDs of macroeconomic series
 # ---------------------------------------------------------------------------
 BCB_SELIC = 432
 BCB_INADIMPLENCIA_PJ = 21082
@@ -78,4 +78,4 @@ BCB_IBC_BR = 24364
 # ---------------------------------------------------------------------------
 # Feature engineering
 # ---------------------------------------------------------------------------
-TEMPORAL_WINDOWS = [30, 90, 365]  # dias
+TEMPORAL_WINDOWS = [30, 90, 365]  # days

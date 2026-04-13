@@ -1,34 +1,34 @@
-"""Gerador de dataset sintético com DGP controlado — Módulo 3.
+"""Synthetic dataset generator with controlled DGP — Module 3.
 
-Objetivo: demonstrar que o mesmo CNPJ tem risco radicalmente diferente
-dependendo do produto e prazo da operação.
+Objective: demonstrate that the same client has radically different risk
+depending on the product and tenor of the operation.
 
-Data Generating Process (DGP) — totalmente documentado e auditável:
+Data Generating Process (DGP) — fully documented and auditable:
 
-PD(cliente, produto, prazo) = sigmoid(
-    β_cliente × score_financeiro
-    + β_produto × efeito_produto[produto]
-    + β_prazo × log(prazo_meses)
-    + β_interacao × score_financeiro × log(prazo_meses)
+PD(client, product, tenor) = sigmoid(
+    β_client × financial_score
+    + β_tenor × product_effect[product]
+    + β_tenor × log(tenor_months)
+    + β_interaction × financial_score × log(tenor_months)
     + ε
 )
 
-Efeitos do produto (β_produto):
+Product effects (β_product):
 - capital_de_giro:        0.0  (baseline)
-- investimento:          +1.2  (prazo longo → PD estruturalmente maior)
-- antecipacao_recebiveis: -0.8 (curto prazo, garantia embutida → PD menor)
+- investimento:          +1.2  (long tenor → structurally higher PD)
+- antecipacao_recebiveis: -0.8 (short tenor, embedded collateral → lower PD)
 
-Efeito do prazo: +0.4 × log(prazo_meses)
-- 1 mês:  log(1) = 0.00 → sem efeito adicional
-- 12 meses: log(12) = 2.48 → +0.99 no logit
-- 48 meses: log(48) = 3.87 → +1.55 no logit
+Tenor effect: +0.4 × log(tenor_months)
+- 1 month:  log(1) = 0.00 → no additional effect
+- 12 months: log(12) = 2.48 → +0.99 in logit
+- 48 months: log(48) = 3.87 → +1.55 in logit
 
-Interação (cliente × prazo):
-- Clientes com score baixo sofrem mais com prazos longos (β_interacao = -0.3)
+Interaction (client × tenor):
+- Clients with low score suffer more with longer tenors (β_interaction = -0.3)
 
-Funções principais:
-- generate_dataset: gera o dataset sintético completo
-- dgp_pd: implementa o DGP para cálculo de PD por contrato
+Main functions:
+- generate_dataset: generates the complete synthetic dataset
+- dgp_pd: implements the DGP for PD calculation per contract
 """
 
 import numpy as np
@@ -38,24 +38,24 @@ from loguru import logger
 from src.config import PRODUCTS, TENORS_MONTHS
 
 # ---------------------------------------------------------------------------
-# Parâmetros do DGP — documentados e versionados aqui
+# DGP parameters — documented and versioned here
 # ---------------------------------------------------------------------------
 DGP_PARAMS = {
-    "beta_cliente": -2.0,  # score alto → PD menor
-    "beta_prazo": 0.4,  # prazo maior → PD maior
-    "beta_interacao": -0.3,  # score baixo penalizado em prazos longos
-    "beta_garantia": -0.6,  # garantia real → PD menor
+    "beta_cliente": -2.0,  # high score → lower PD
+    "beta_prazo": 0.4,  # longer tenor → higher PD
+    "beta_interacao": -0.3,  # low score penalised more at long tenors
+    "beta_garantia": -0.6,  # collateral → lower PD
     "product_effects": {
         "capital_de_giro": 0.0,  # baseline
-        "investimento": 1.2,  # risco estrutural de longo prazo
-        "antecipacao_recebiveis": -0.8,  # garantia embutida (recebíveis)
+        "investimento": 1.2,  # structural long-tenor risk
+        "antecipacao_recebiveis": -0.8,  # embedded collateral (receivables)
     },
     "lgd_base": {
         "capital_de_giro": 0.55,
-        "investimento": 0.65,  # sem garantia real → LGD maior
-        "antecipacao_recebiveis": 0.30,  # recebíveis como colateral
+        "investimento": 0.65,  # no real collateral → higher LGD
+        "antecipacao_recebiveis": 0.30,  # receivables as collateral
     },
-    "noise_std": 0.5,  # variabilidade idiossincrática
+    "noise_std": 0.5,  # idiosyncratic variability
 }
 
 
@@ -67,18 +67,18 @@ def dgp_pd(
     params: dict = DGP_PARAMS,
     rng: np.random.Generator | None = None,
 ) -> np.ndarray:
-    """Calcula PD via o DGP controlado.
+    """Calculates PD via the controlled DGP.
 
     Args:
-        score_financeiro: Score normalizado [0,1] do cliente (maior = melhor).
-        produto: Tipo de produto ('capital_de_giro', 'investimento', 'antecipacao_recebiveis').
-        prazo_meses: Prazo em meses.
-        has_collateral: Array binário (1 = com garantia real).
-        params: Parâmetros do DGP.
-        rng: Gerador aleatório numpy.
+        score_financeiro: Client's normalised score [0,1] (higher = better).
+        produto: Product type ('capital_de_giro', 'investimento', 'antecipacao_recebiveis').
+        prazo_meses: Tenor in months.
+        has_collateral: Binary array (1 = with real collateral).
+        params: DGP parameters.
+        rng: Numpy random generator.
 
     Returns:
-        Array de PD por contrato em [0, 1].
+        Array of PD per contract in [0, 1].
     """
     if rng is None:
         rng = np.random.default_rng(42)
@@ -102,49 +102,49 @@ def generate_dataset(
     n: int = 5000,
     seed: int = 42,
 ) -> pd.DataFrame:
-    """Gera dataset sintético com DGP controlado.
+    """Generates synthetic dataset with controlled DGP.
 
-    Cada linha representa um contrato com:
-    - Perfil do cliente (score_financeiro, idade, setor)
-    - Contexto da operação (produto, prazo, garantia)
-    - PD real (gerada pelo DGP) + default observado
-    - LGD real (determinístico + ruído)
+    Each row represents a contract with:
+    - Client profile (score_financeiro, age, sector)
+    - Operation context (product, tenor, collateral)
+    - True PD (generated by DGP) + observed default
+    - True LGD (deterministic + noise)
     - EL = PD × LGD × EAD
 
-    O mesmo cliente aparece com múltiplos produtos/prazos para
-    demonstrar que o risco é contextual.
+    The same client appears with multiple products/tenors to
+    demonstrate that risk is contextual.
 
     Args:
-        n: Número total de contratos.
-        seed: Semente aleatória (reproduzível).
+        n: Total number of contracts.
+        seed: Random seed (reproducible).
 
     Returns:
-        DataFrame com o dataset sintético completo.
+        DataFrame with the complete synthetic dataset.
     """
     rng = np.random.default_rng(seed)
 
-    # Número de clientes únicos (cada cliente tem ~3 contratos em contextos diferentes)
+    # Number of unique clients (each client has ~3 contracts in different contexts)
     n_clients = n // 3
 
     # ---------------------------------------------------------------------------
-    # Perfil dos clientes (fixo por cliente)
+    # Client profiles (fixed per client)
     # ---------------------------------------------------------------------------
     client_ids = np.arange(n_clients)
     score_financeiro = rng.beta(
         a=2, b=3, size=n_clients
-    )  # distribuição assimétrica à esquerda
+    )  # left-skewed distribution
     idade_empresa_anos = rng.integers(1, 30, size=n_clients)
     setor = rng.choice(
         ["comercio", "servicos", "industria", "agronegocio"], size=n_clients
     )
-    faturamento_anual = rng.lognormal(mean=12, sigma=1.5, size=n_clients)  # R$
+    faturamento_anual = rng.lognormal(mean=12, sigma=1.5, size=n_clients)
 
     # ---------------------------------------------------------------------------
-    # Contratos: cruza cada cliente com combinações de produto × prazo
+    # Contracts: cross each client with product × tenor combinations
     # ---------------------------------------------------------------------------
     records = []
     for client_idx in range(n_clients):
-        # Sorteia 3 contextos diferentes para o mesmo cliente
+        # Draw 3 different contexts for the same client
         contexts = rng.choice(len(PRODUCTS) * len(TENORS_MONTHS), size=3, replace=False)
         for ctx_idx in contexts:
             produto = PRODUCTS[ctx_idx % len(PRODUCTS)]
@@ -189,8 +189,8 @@ def generate_dataset(
     df = pd.DataFrame(records).reset_index(drop=True)
 
     logger.success(
-        f"Dataset sintético gerado: {len(df):,} contratos × {df.shape[1]} colunas | "
-        f"Taxa de default: {df['default'].mean():.2%} | "
-        f"PD média: {df['pd_true'].mean():.3f}"
+        f"Synthetic dataset generated: {len(df):,} contracts × {df.shape[1]} columns | "
+        f"Default rate: {df['default'].mean():.2%} | "
+        f"Mean PD: {df['pd_true'].mean():.3f}"
     )
     return df

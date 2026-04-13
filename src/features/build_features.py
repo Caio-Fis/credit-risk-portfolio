@@ -1,14 +1,14 @@
-"""Construção da feature store batch com janelas temporais 30/90/365 dias.
+"""Batch feature store construction with 30/90/365-day time windows.
 
-Funções principais:
-- merge_tables: une application_train com tabelas auxiliares do Home Credit
-- build_temporal_features: agrega features por janelas temporais
-- save_feature_store: persiste a feature store em parquet
-- load_feature_store: carrega a feature store já construída
+Main functions:
+- merge_tables: joins application_train with Home Credit auxiliary tables
+- build_temporal_features: aggregates features by time windows
+- save_feature_store: persists the feature store as parquet
+- load_feature_store: loads the already-built feature store
 
-Tabelas grandes (>10M linhas) são agregadas via batch chunked em
-batch_aggregations.py para evitar OOM — o pandas nunca materializa as
-27M ou 13.6M linhas de uma vez; processa em lotes de 1M linhas.
+Large tables (>10M rows) are aggregated via batch chunked processing in
+batch_aggregations.py to avoid OOM — pandas never materialises the
+27M or 13.6M rows at once; processes in batches of 1M rows.
 """
 
 from pathlib import Path
@@ -32,19 +32,19 @@ def _load_raw(filename: str, data_dir: Path = HOME_CREDIT_DIR) -> pd.DataFrame:
     path = data_dir / filename
     if not path.exists():
         raise FileNotFoundError(
-            f"{filename} não encontrado em {data_dir}. Rode `make data` primeiro."
+            f"{filename} not found in {data_dir}. Run `make data` first."
         )
-    logger.debug(f"Carregando {filename}...")
+    logger.debug(f"Loading {filename}...")
     return pd.read_csv(path)
 
 
 # ---------------------------------------------------------------------------
-# Features de aplicações anteriores (tabela pequena — mantém em pandas)
+# Previous application features (small table — stays in pandas)
 # ---------------------------------------------------------------------------
 
 
 def _build_prev_application_features(prev: pd.DataFrame) -> pd.DataFrame:
-    """Conta aplicações e recusas por janela (proxy: DAYS_DECISION)."""
+    """Counts applications and refusals by window (proxy: DAYS_DECISION)."""
     prev = prev.copy()
     prev["is_refused"] = (prev["NAME_CONTRACT_STATUS"] == "Refused").astype(int)
 
@@ -72,32 +72,32 @@ def _build_prev_application_features(prev: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# API pública
+# Public API
 # ---------------------------------------------------------------------------
 
 
 def merge_tables(data_dir: Path = HOME_CREDIT_DIR) -> pd.DataFrame:
-    """Une application_train com features das tabelas auxiliares.
+    """Joins application_train with features from auxiliary tables.
 
-    Tabelas pequenas (<2M linhas) são processadas em pandas.
-    Tabelas grandes (bureau_balance 27M, installments 13.6M) são delegadas
-    ao Spark via spark_aggregations para evitar OOM.
+    Small tables (<2M rows) are processed in pandas.
+    Large tables (bureau_balance 27M, installments 13.6M) are delegated
+    to batch chunked aggregations to avoid OOM.
 
     Args:
-        data_dir: Diretório com os CSVs brutos.
+        data_dir: Directory with raw CSVs.
 
     Returns:
-        DataFrame amplo com features de todas as fontes.
+        Wide DataFrame with features from all sources.
     """
     app = _load_raw("application_train.csv", data_dir)
     logger.info(f"application_train: {app.shape}")
 
-    # Pandas: previous_application é pequeno (~887K linhas), sem risco de OOM
+    # Pandas: previous_application is small (~887K rows), no OOM risk
     prev = _load_raw("previous_application.csv", data_dir)
     prev_feats = _build_prev_application_features(prev)
-    del prev  # libera antes de iniciar o Spark
+    del prev  # free before starting batch processing
 
-    # Batch chunked: bureau_balance (27M) + installments (13.6M) em lotes de 1M linhas
+    # Batch chunked: bureau_balance (27M) + installments (13.6M) in 1M-row batches
     bureau_feats = build_bureau_features_batch(
         bureau_path=data_dir / "bureau.csv",
         bureau_bal_path=data_dir / "bureau_balance.csv",
@@ -124,7 +124,7 @@ def merge_tables(data_dir: Path = HOME_CREDIT_DIR) -> pd.DataFrame:
         .merge(cc_feats, on="SK_ID_CURR", how="left")
     )
 
-    logger.info(f"Tabela unificada: {df.shape}")
+    logger.info(f"Unified table: {df.shape}")
     return df
 
 
@@ -132,50 +132,50 @@ def build_temporal_features(
     df: pd.DataFrame,
     windows: list[int] = TEMPORAL_WINDOWS,
 ) -> pd.DataFrame:
-    """Adiciona features derivadas sobre o DataFrame já unificado.
+    """Adds derived features to the already-unified DataFrame.
 
-    Inclui:
-    - Razões de crédito (crédito/renda, anuidade/renda)
-    - Flags de emprego anômalo
-    - Score externo médio
+    Includes:
+    - Credit ratios (credit/income, annuity/income)
+    - Anomalous employment flags
+    - Mean external score
 
     Args:
-        df: DataFrame resultado de merge_tables().
-        windows: Janelas temporais a considerar (informativo, não recomputa).
+        df: DataFrame result of merge_tables().
+        windows: Time windows to consider (informational, does not recompute).
 
     Returns:
-        DataFrame com features adicionais.
+        DataFrame with additional features.
     """
     df = df.copy()
 
-    # Razões financeiras
+    # Financial ratios
     df["credit_income_ratio"] = df["AMT_CREDIT"] / (df["AMT_INCOME_TOTAL"] + 1)
     df["annuity_income_ratio"] = df["AMT_ANNUITY"] / (df["AMT_INCOME_TOTAL"] + 1)
     df["credit_annuity_ratio"] = df["AMT_CREDIT"] / (df["AMT_ANNUITY"] + 1)
 
-    # Idade e tempo de emprego em anos
+    # Age and employment duration in years
     df["age_years"] = -df["DAYS_BIRTH"] / 365
     df["employed_years"] = np.where(
-        df["DAYS_EMPLOYED"] == 365243,  # código para "não empregado"
+        df["DAYS_EMPLOYED"] == 365243,  # code for "unemployed"
         0,
         -df["DAYS_EMPLOYED"] / 365,
     )
     df["employed_to_age_ratio"] = df["employed_years"] / (df["age_years"] + 1)
 
-    # Score externo: agregações e interações
+    # External score: aggregations and interactions
     ext_cols = ["EXT_SOURCE_1", "EXT_SOURCE_2", "EXT_SOURCE_3"]
     available = [c for c in ext_cols if c in df.columns]
     if available:
         df["ext_source_mean"] = df[available].mean(axis=1)
         df["ext_source_min"] = df[available].min(axis=1)
         df["ext_source_max"] = df[available].max(axis=1)
-        # Produto dos EXT_SOURCE — captura sinal conjunto; top feature em Kaggle Home Credit
+        # Product of EXT_SOURCEs — captures joint signal; top feature in Kaggle Home Credit
         df["ext_source_product"] = df[available].prod(axis=1)
-        # Interação pairwise entre os dois scores mais preditivos
+        # Pairwise interaction between the two most predictive scores
         if "EXT_SOURCE_2" in df.columns and "EXT_SOURCE_3" in df.columns:
             df["ext_source_2x3"] = df["EXT_SOURCE_2"] * df["EXT_SOURCE_3"]
 
-    # Taxa de inadimplência no bureau por janela
+    # Bureau overdue rate by window
     for w in windows:
         cnt_col = f"bureau_cnt_credits_{w}d"
         ovd_col = f"bureau_cnt_overdue_{w}d"
@@ -184,7 +184,7 @@ def build_temporal_features(
                 df[ovd_col] / (df[cnt_col] + 1)
             )
 
-    # Taxa de recusa em aplicações anteriores por janela
+    # Refusal rate in previous applications by window
     for w in windows:
         app_col = f"prev_cnt_applications_{w}d"
         ref_col = f"prev_cnt_refused_{w}d"
@@ -193,26 +193,26 @@ def build_temporal_features(
                 df[ref_col] / (df[app_col] + 1)
             )
 
-    # Inadimplência no círculo social (proxy de rede de risco)
+    # Social circle default rate (risk network proxy)
     if "DEF_30_CNT_SOCIAL_CIRCLE" in df.columns and "OBS_30_CNT_SOCIAL_CIRCLE" in df.columns:
         df["social_circle_default_rate"] = (
             df["DEF_30_CNT_SOCIAL_CIRCLE"] / (df["OBS_30_CNT_SOCIAL_CIRCLE"] + 1)
         )
 
-    # LTV: razão crédito / bem financiado
+    # LTV: credit / financed asset ratio
     if "AMT_GOODS_PRICE" in df.columns:
         df["credit_goods_ratio"] = df["AMT_CREDIT"] / (df["AMT_GOODS_PRICE"] + 1)
 
-    # Renda per capita familiar
+    # Per-capita family income
     if "CNT_FAM_MEMBERS" in df.columns:
         df["income_per_family_member"] = (
             df["AMT_INCOME_TOTAL"] / (df["CNT_FAM_MEMBERS"] + 1)
         )
 
-    # Flag explícito de desempregado (365243 é código especial — o flag tem sinal diferente do 0)
+    # Explicit unemployed flag (365243 is a special code — the flag has a different signal than 0)
     df["flag_unemployed"] = (df["DAYS_EMPLOYED"] == 365243).astype(np.int8)
 
-    logger.info(f"Features construídas: {df.shape[1]} colunas")
+    logger.info(f"Features built: {df.shape[1]} columns")
     return df
 
 
@@ -220,19 +220,19 @@ def save_feature_store(
     df: pd.DataFrame,
     output_path: Path = PROCESSED_DIR / "feature_store.parquet",
 ) -> Path:
-    """Persiste a feature store em parquet.
+    """Persists the feature store as parquet.
 
     Args:
-        df: DataFrame com todas as features.
-        output_path: Caminho de saída.
+        df: DataFrame with all features.
+        output_path: Output path.
 
     Returns:
-        Path do arquivo salvo.
+        Path to the saved file.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(output_path, index=False)
     logger.success(
-        f"Feature store salva: {output_path} ({df.shape[0]:,} × {df.shape[1]})"
+        f"Feature store saved: {output_path} ({df.shape[0]:,} × {df.shape[1]})"
     )
     return output_path
 
@@ -240,20 +240,20 @@ def save_feature_store(
 def load_feature_store(
     path: Path = PROCESSED_DIR / "feature_store.parquet",
 ) -> pd.DataFrame:
-    """Carrega a feature store já construída.
+    """Loads the already-built feature store.
 
     Args:
-        path: Caminho do arquivo parquet.
+        path: Path to the parquet file.
 
     Returns:
-        DataFrame com todas as features.
+        DataFrame with all features.
     """
     if not path.exists():
         raise FileNotFoundError(
-            f"Feature store não encontrada em {path}. Rode `make features`."
+            f"Feature store not found at {path}. Run `make features`."
         )
     df = pd.read_parquet(path)
-    logger.info(f"Feature store carregada: {df.shape[0]:,} × {df.shape[1]}")
+    logger.info(f"Feature store loaded: {df.shape[0]:,} × {df.shape[1]}")
     return df
 
 

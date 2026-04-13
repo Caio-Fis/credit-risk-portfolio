@@ -1,199 +1,199 @@
-# Contrato de features — todas as features do pipeline documentadas aqui
-# Campos: name, description, window_days (null se não temporal), source, dtype
+# Feature contract — all pipeline features documented here
+# Fields: name, description, window_days (null if not temporal), source, dtype
 
 features:
 
   # ---------------------------------------------------------------------------
-  # Features de identidade / cadastro
+  # Identity / registration features
   # ---------------------------------------------------------------------------
   - name: sk_id_curr
-    description: Identificador único do contrato/cliente
+    description: Unique contract/client identifier
     window_days: null
     source: home_credit/application_train.csv
     dtype: int64
 
   - name: target
-    description: "1 = default (pagamento atrasado >90d), 0 = adimplente"
+    description: "1 = default (payment overdue >90d), 0 = no default"
     window_days: null
     source: home_credit/application_train.csv
     dtype: int8
 
   - name: amt_credit
-    description: Valor total do crédito concedido (EAD proxy)
+    description: Total credit amount granted (EAD proxy)
     window_days: null
     source: home_credit/application_train.csv
     dtype: float64
 
   - name: amt_income_total
-    description: Renda anual declarada pelo solicitante
+    description: Annual income declared by the applicant
     window_days: null
     source: home_credit/application_train.csv
     dtype: float64
 
   - name: amt_annuity
-    description: Anuidade do empréstimo
+    description: Loan annuity amount
     window_days: null
     source: home_credit/application_train.csv
     dtype: float64
 
   - name: days_birth
-    description: Idade em dias (negativo — dias desde o nascimento até a data de referência)
+    description: Age in days (negative — days from birth to reference date)
     window_days: null
     source: home_credit/application_train.csv
     dtype: int32
 
   - name: days_employed
-    description: Tempo de emprego em dias (negativo; 365243 = não empregado)
+    description: Employment duration in days (negative; 365243 = unemployed)
     window_days: null
     source: home_credit/application_train.csv
     dtype: int32
 
   - name: ext_source_1
-    description: Score externo de bureau 1 (normalizado 0–1)
+    description: External bureau score 1 (normalized 0–1)
     window_days: null
     source: home_credit/application_train.csv
     dtype: float64
 
   - name: ext_source_2
-    description: Score externo de bureau 2 (normalizado 0–1)
+    description: External bureau score 2 (normalized 0–1)
     window_days: null
     source: home_credit/application_train.csv
     dtype: float64
 
   - name: ext_source_3
-    description: Score externo de bureau 3 (normalizado 0–1)
+    description: External bureau score 3 (normalized 0–1)
     window_days: null
     source: home_credit/application_train.csv
     dtype: float64
 
   # ---------------------------------------------------------------------------
-  # Features derivadas — janelas temporais (bureau_balance)
+  # Derived features — time windows (bureau_balance)
   # ---------------------------------------------------------------------------
   - name: bureau_cnt_credits_30d
-    description: Número de créditos ativos nos últimos 30 dias (bureau)
+    description: Number of active credits in the last 30 days (bureau)
     window_days: 30
     source: home_credit/bureau.csv + bureau_balance.csv
     dtype: int32
 
   - name: bureau_cnt_credits_90d
-    description: Número de créditos ativos nos últimos 90 dias (bureau)
+    description: Number of active credits in the last 90 days (bureau)
     window_days: 90
     source: home_credit/bureau.csv + bureau_balance.csv
     dtype: int32
 
   - name: bureau_cnt_credits_365d
-    description: Número de créditos ativos nos últimos 365 dias (bureau)
+    description: Number of active credits in the last 365 days (bureau)
     window_days: 365
     source: home_credit/bureau.csv + bureau_balance.csv
     dtype: int32
 
   - name: bureau_cnt_overdue_30d
-    description: Número de créditos em atraso nos últimos 30 dias
+    description: Number of overdue credits in the last 30 days
     window_days: 30
     source: home_credit/bureau_balance.csv
     dtype: int32
 
   - name: bureau_cnt_overdue_90d
-    description: Número de créditos em atraso nos últimos 90 dias
+    description: Number of overdue credits in the last 90 days
     window_days: 90
     source: home_credit/bureau_balance.csv
     dtype: int32
 
   - name: bureau_cnt_overdue_365d
-    description: Número de créditos em atraso nos últimos 365 dias
+    description: Number of overdue credits in the last 365 days
     window_days: 365
     source: home_credit/bureau_balance.csv
     dtype: int32
 
   - name: prev_cnt_applications_30d
-    description: Número de pedidos de crédito anteriores nos últimos 30 dias
+    description: Number of previous credit applications in the last 30 days
     window_days: 30
     source: home_credit/previous_application.csv
     dtype: int32
 
   - name: prev_cnt_applications_90d
-    description: Número de pedidos de crédito anteriores nos últimos 90 dias
+    description: Number of previous credit applications in the last 90 days
     window_days: 90
     source: home_credit/previous_application.csv
     dtype: int32
 
   - name: prev_cnt_refused_90d
-    description: Número de pedidos recusados nos últimos 90 dias
+    description: Number of refused applications in the last 90 days
     window_days: 90
     source: home_credit/previous_application.csv
     dtype: int32
 
   - name: installments_dpd_mean_30d
-    description: Média de dias de atraso nas parcelas dos últimos 30 dias
+    description: Mean days past due on installments in the last 30 days
     window_days: 30
     source: home_credit/installments_payments.csv
     dtype: float64
 
   - name: installments_dpd_mean_90d
-    description: Média de dias de atraso nas parcelas dos últimos 90 dias
+    description: Mean days past due on installments in the last 90 days
     window_days: 90
     source: home_credit/installments_payments.csv
     dtype: float64
 
   - name: installments_dpd_max_90d
-    description: Máximo de dias de atraso nas parcelas dos últimos 90 dias
+    description: Maximum days past due on installments in the last 90 days
     window_days: 90
     source: home_credit/installments_payments.csv
     dtype: float64
 
   # ---------------------------------------------------------------------------
-  # Features macroeconômicas (BCB SGS)
+  # Macroeconomic features (BCB SGS)
   # ---------------------------------------------------------------------------
   - name: selic_rate
-    description: Taxa Selic anualizada (%) na data de referência — série BCB 432
+    description: Annualized Selic rate (%) at the reference date — BCB series 432
     window_days: null
     source: bcb_sgs/serie_432
     dtype: float64
 
   - name: pj_default_rate
-    description: Taxa de inadimplência PJ (%) — série BCB 21082
+    description: Corporate default rate (%) — BCB series 21082
     window_days: null
     source: bcb_sgs/serie_21082
     dtype: float64
 
   - name: ibc_br_yoy
-    description: Variação anual do IBC-Br (proxy de atividade econômica) — série BCB 24364
+    description: IBC-Br year-over-year change (economic activity proxy) — BCB series 24364
     window_days: null
     source: bcb_sgs/serie_24364
     dtype: float64
 
   # ---------------------------------------------------------------------------
-  # Features de LGD (Módulo 1)
+  # LGD features (Module 1)
   # ---------------------------------------------------------------------------
   - name: lgd
-    description: "Loss Given Default observado: (1 - taxa de recuperação). Variável resposta do modelo LGD."
+    description: "Observed Loss Given Default: (1 - recovery rate). Target variable for the LGD model."
     window_days: null
-    source: derivado/recovery_rate
+    source: derived/recovery_rate
     dtype: float64
 
   # ---------------------------------------------------------------------------
-  # Features contextuais (Módulo 3 — dataset sintético)
+  # Contextual features (Module 3 — synthetic dataset)
   # ---------------------------------------------------------------------------
   - name: product_type
-    description: "Tipo de produto: capital_de_giro | investimento | antecipacao_recebiveis"
+    description: "Product type: working_capital | investment | receivables_advance"
     window_days: null
     source: synthetic/contextual
     dtype: category
 
   - name: tenor_months
-    description: "Prazo do contrato em meses: 1, 3, 6, 12, 24, 36, 48"
+    description: "Contract term in months: 1, 3, 6, 12, 24, 36, 48"
     window_days: null
     source: synthetic/contextual
     dtype: int8
 
   - name: has_collateral
-    description: "1 = contrato com garantia real, 0 = sem garantia"
+    description: "1 = contract with collateral, 0 = unsecured"
     window_days: null
     source: synthetic/contextual
     dtype: int8
 
   - name: pd_single_score
-    description: Score único de PD (output do modelo baseline, usado como feature no modelo contextual)
+    description: Single PD score (output of baseline model, used as feature in contextual model)
     window_days: null
     source: derived/pd_model
     dtype: float64

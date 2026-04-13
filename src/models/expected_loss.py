@@ -1,15 +1,15 @@
-"""Cálculo de Expected Loss por contrato.
+"""Expected Loss calculation per contract.
 
 EL = PD × LGD × EAD
 
-- PD: Probabilidade de Default (modelo calibrado)
-- LGD: Loss Given Default (regressão Beta)
-- EAD: Exposure at Default — valor exposto ao risco (proxy: AMT_CREDIT)
+- PD: Probability of Default (calibrated model)
+- LGD: Loss Given Default (Beta regression)
+- EAD: Exposure at Default — amount at risk (proxy: AMT_CREDIT)
 
-Funções principais:
-- compute_el: calcula EL por contrato em R$
-- el_summary: sumariza EL da carteira (total, médio, por decil de risco)
-- el_by_segment: breakdown por segmento (produto, prazo, etc.)
+Main functions:
+- compute_el: calculates EL per contract in currency units
+- el_summary: summarises portfolio EL (total, mean, by risk decile)
+- el_by_segment: breakdown by segment (product, tenor, etc.)
 """
 
 import numpy as np
@@ -22,29 +22,29 @@ def compute_el(
     lgd: np.ndarray | pd.Series,
     ead: np.ndarray | pd.Series,
 ) -> pd.Series:
-    """Calcula Expected Loss por contrato: EL = PD × LGD × EAD.
+    """Calculates Expected Loss per contract: EL = PD × LGD × EAD.
 
     Args:
-        pd_proba: Probabilidade de default calibrada (0–1).
-        lgd: Loss Given Default estimado (0–1).
-        ead: Exposure at Default em R$ (valor do crédito).
+        pd_proba: Calibrated default probability (0–1).
+        lgd: Estimated Loss Given Default (0–1).
+        ead: Exposure at Default in currency units (credit amount).
 
     Returns:
-        pd.Series com EL em R$ por contrato.
+        pd.Series with EL in currency units per contract.
     """
     pd_arr = np.asarray(pd_proba, dtype=float)
     lgd_arr = np.asarray(lgd, dtype=float)
     ead_arr = np.asarray(ead, dtype=float)
 
     if not (len(pd_arr) == len(lgd_arr) == len(ead_arr)):
-        raise ValueError("pd_proba, lgd e ead devem ter o mesmo comprimento.")
+        raise ValueError("pd_proba, lgd, and ead must have the same length.")
 
     el = pd_arr * lgd_arr * ead_arr
 
     logger.info(
-        f"EL calculado — total R$ {el.sum():,.2f} | "
-        f"médio R$ {el.mean():,.2f} | "
-        f"max R$ {el.max():,.2f}"
+        f"EL computed — total: {el.sum():,.2f} | "
+        f"mean: {el.mean():,.2f} | "
+        f"max: {el.max():,.2f}"
     )
     return pd.Series(el, name="expected_loss")
 
@@ -54,18 +54,18 @@ def el_summary(
     el_col: str = "expected_loss",
     ead_col: str = "AMT_CREDIT",
 ) -> pd.DataFrame:
-    """Sumariza Expected Loss da carteira.
+    """Summarises portfolio Expected Loss.
 
     Args:
-        df: DataFrame com colunas de EL e EAD.
-        el_col: Nome da coluna de EL.
-        ead_col: Nome da coluna de EAD.
+        df: DataFrame with EL and EAD columns.
+        el_col: EL column name.
+        ead_col: EAD column name.
 
     Returns:
-        DataFrame com estatísticas da carteira.
+        DataFrame with portfolio statistics.
     """
     if el_col not in df.columns:
-        raise KeyError(f"Coluna '{el_col}' não encontrada. Rode compute_el() primeiro.")
+        raise KeyError(f"Column '{el_col}' not found. Run compute_el() first.")
 
     total_ead = df[ead_col].sum() if ead_col in df.columns else np.nan
     total_el = df[el_col].sum()
@@ -74,13 +74,13 @@ def el_summary(
     summary = pd.DataFrame(
         [
             {
-                "total_ead_R$": total_ead,
-                "total_el_R$": total_el,
+                "total_ead": total_ead,
+                "total_el": total_el,
                 "el_rate_%": el_rate * 100,
-                "el_mean_R$": df[el_col].mean(),
-                "el_median_R$": df[el_col].median(),
-                "el_p95_R$": df[el_col].quantile(0.95),
-                "el_p99_R$": df[el_col].quantile(0.99),
+                "el_mean": df[el_col].mean(),
+                "el_median": df[el_col].median(),
+                "el_p95": df[el_col].quantile(0.95),
+                "el_p99": df[el_col].quantile(0.99),
                 "n_contracts": len(df),
             }
         ]
@@ -96,16 +96,16 @@ def el_by_segment(
     el_col: str = "expected_loss",
     ead_col: str = "AMT_CREDIT",
 ) -> pd.DataFrame:
-    """Breakdown de EL por segmento.
+    """EL breakdown by segment.
 
     Args:
-        df: DataFrame com EL calculado.
-        segment_col: Coluna de segmentação (ex: product_type, tenor_months).
-        el_col: Coluna de EL.
-        ead_col: Coluna de EAD.
+        df: DataFrame with computed EL.
+        segment_col: Segmentation column (e.g.: product_type, tenor_months).
+        el_col: EL column.
+        ead_col: EAD column.
 
     Returns:
-        DataFrame com EL agregado por segmento.
+        DataFrame with EL aggregated by segment.
     """
     agg = (
         df.groupby(segment_col)
@@ -128,20 +128,20 @@ def add_el_to_df(
     lgd_col: str = "lgd_pred",
     ead_col: str = "AMT_CREDIT",
 ) -> pd.DataFrame:
-    """Adiciona coluna expected_loss ao DataFrame.
+    """Adds expected_loss column to the DataFrame.
 
     Args:
-        df: DataFrame com colunas de PD, LGD e EAD.
-        pd_col: Coluna de PD predito.
-        lgd_col: Coluna de LGD predito.
-        ead_col: Coluna de EAD.
+        df: DataFrame with PD, LGD, and EAD columns.
+        pd_col: Predicted PD column.
+        lgd_col: Predicted LGD column.
+        ead_col: EAD column.
 
     Returns:
-        DataFrame com coluna 'expected_loss' adicionada.
+        DataFrame with 'expected_loss' column added.
     """
     for col in (pd_col, lgd_col, ead_col):
         if col not in df.columns:
-            raise KeyError(f"Coluna '{col}' não encontrada no DataFrame.")
+            raise KeyError(f"Column '{col}' not found in DataFrame.")
 
     df = df.copy()
     df["expected_loss"] = compute_el(df[pd_col], df[lgd_col], df[ead_col])

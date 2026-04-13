@@ -1,4 +1,4 @@
-"""Score Contextual — mesmo cliente, produtos diferentes ao vivo."""
+"""Contextual Score — same client, different products live."""
 
 import sys
 from pathlib import Path
@@ -11,15 +11,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from src.contextual.data_generator import generate_dataset
 from src.contextual.interaction_model import score_by_context, train_contextual
 
-st.set_page_config(page_title="Score Contextual", layout="wide")
-st.title("Score Contextual")
+st.set_page_config(page_title="Contextual Score", layout="wide")
+st.title("Contextual Score")
 st.caption(
-    "Demonstração ao vivo: o mesmo cliente tem risco radicalmente diferente "
-    "dependendo do produto e do prazo solicitado."
+    "Live demonstration: the same client has radically different risk "
+    "depending on the product and tenor requested."
 )
 
 
-@st.cache_resource(show_spinner="Treinando modelo contextual...")
+@st.cache_resource(show_spinner="Training contextual model...")
 def load_contextual_model():
     df = generate_dataset(n=3000, seed=42)
     model, feature_names = train_contextual(df, seed=42)
@@ -29,21 +29,21 @@ def load_contextual_model():
 model_ctx, feature_names = load_contextual_model()
 
 # ---------------------------------------------------------------------------
-# Perfil do cliente
+# Client profile
 # ---------------------------------------------------------------------------
-st.subheader("Configure o Perfil do Cliente")
+st.subheader("Configure Client Profile")
 col_a, col_b, col_c = st.columns(3)
 
 with col_a:
-    score_fin = st.slider("Score financeiro (0=fraco, 1=forte)", 0.0, 1.0, 0.5, 0.05)
+    score_fin = st.slider("Financial score (0=weak, 1=strong)", 0.0, 1.0, 0.5, 0.05)
 with col_b:
     faturamento = st.number_input(
-        "Faturamento anual (R$)", 50_000, 10_000_000, 500_000, 50_000
+        "Annual revenue", 50_000, 10_000_000, 500_000, 50_000
     )
 with col_c:
-    has_collateral = int(st.checkbox("Tem garantia real"))
+    has_collateral = int(st.checkbox("Has real collateral"))
 
-ead = st.number_input("Valor da operação (EAD, R$)", 5_000, 2_000_000, 100_000, 5_000)
+ead = st.number_input("Operation amount (EAD)", 5_000, 2_000_000, 100_000, 5_000)
 
 client_profile = {
     "score_financeiro": score_fin,
@@ -54,14 +54,14 @@ client_profile = {
 }
 
 # ---------------------------------------------------------------------------
-# Cálculo ao vivo
+# Live calculation
 # ---------------------------------------------------------------------------
 scores = score_by_context(client_profile, model_ctx, feature_names)
-scores["el_R$"] = scores["el_contextual"]
+scores["el_value"] = scores["el_contextual"]
 scores["pd_pct"] = scores["pd_contextual"] * 100
 
-# Heatmap PD
-st.subheader("PD Contextual — Produto × Prazo (mesmo cliente)")
+# PD Heatmap
+st.subheader("Contextual PD — Product × Tenor (same client)")
 pivot_pd = scores.pivot(
     index="tenor_months", columns="product_type", values="pd_contextual"
 )
@@ -72,46 +72,46 @@ fig_heat = px.imshow(
     color_continuous_scale="RdYlGn_r",
     zmin=0,
     zmax=min(0.5, pivot_pd.values.max() * 1.5),
-    labels={"x": "Produto", "y": "Prazo (meses)", "color": "PD"},
-    title="PD por Produto × Prazo (score único ignoraria essas diferenças)",
+    labels={"x": "Product", "y": "Tenor (months)", "color": "PD"},
+    title="PD by Product × Tenor (a single score would ignore these differences)",
 )
 st.plotly_chart(fig_heat, use_container_width=True)
 
 # ---------------------------------------------------------------------------
-# Gráfico de EL por produto
+# EL by product chart
 # ---------------------------------------------------------------------------
-st.subheader("Expected Loss (R$) por Produto e Prazo")
+st.subheader("Expected Loss by Product and Tenor")
 fig_el = px.line(
     scores.sort_values("tenor_months"),
     x="tenor_months",
-    y="el_R$",
+    y="el_value",
     color="product_type",
     markers=True,
     labels={
-        "tenor_months": "Prazo (meses)",
-        "el_R$": "Expected Loss (R$)",
-        "product_type": "Produto",
+        "tenor_months": "Tenor (months)",
+        "el_value": "Expected Loss",
+        "product_type": "Product",
     },
-    title="Como o EL evolui com o prazo — diferente por produto",
+    title="How EL evolves with tenor — different by product",
 )
 st.plotly_chart(fig_el, use_container_width=True)
 
 # ---------------------------------------------------------------------------
-# Conclusão
+# Conclusion
 # ---------------------------------------------------------------------------
-min_el = scores["el_R$"].min()
-max_el = scores["el_R$"].max()
+min_el = scores["el_value"].min()
+max_el = scores["el_value"].max()
 ratio = max_el / (min_el + 0.01)
 
 st.divider()
-st.subheader("O argumento central")
+st.subheader("The central argument")
 st.info(f"""
-Para este cliente com score financeiro **{score_fin:.2f}** e EAD de **R$ {ead:,.0f}**:
+For this client with financial score **{score_fin:.2f}** and EAD of **{ead:,.0f}**:
 
-- Expected Loss **mínimo**: R$ {min_el:,.0f} (operação de menor risco)
-- Expected Loss **máximo**: R$ {max_el:,.0f} (operação de maior risco)
-- **Razão máx/mín**: {ratio:.1f}x
+- **Minimum** Expected Loss: {min_el:,.0f} (lowest-risk operation)
+- **Maximum** Expected Loss: {max_el:,.0f} (highest-risk operation)
+- **Max/min ratio**: {ratio:.1f}x
 
-Usar score único significa tratar todos esses casos como equivalentes.
-O modelo contextual **diferencia {ratio:.1f}x** o risco entre produtos/prazos do mesmo cliente.
+Using a single score means treating all these cases as equivalent.
+The contextual model **differentiates {ratio:.1f}x** the risk across products/tenors for the same client.
 """)

@@ -51,3 +51,6 @@ data/processed/feature_store.parquet
 
 # Logs
 logs/
+
+# uv lockfile — requirements.txt already pins all deps for deployment
+uv.lock

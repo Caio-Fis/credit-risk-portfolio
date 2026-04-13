@@ -1,4 +1,4 @@
-"""Dashboard de carteira com KPIs agregados e performance do modelo PD."""
+"""Portfolio dashboard with aggregated KPIs and PD model performance."""
 
 import sys
 from pathlib import Path
@@ -21,9 +21,9 @@ from src.evaluate.metrics import (
 )
 from src.models.expected_loss import el_by_segment
 
-st.set_page_config(page_title="Dashboard de Portfólio", layout="wide")
-st.title("Dashboard de Portfólio")
-st.caption("Visão consolidada da carteira de crédito PJ.")
+st.set_page_config(page_title="Portfolio Dashboard", layout="wide")
+st.title("Portfolio Dashboard")
+st.caption("Consolidated view of the corporate credit portfolio.")
 
 
 @st.cache_data
@@ -39,43 +39,43 @@ def load_portfolio():
 df = load_portfolio()
 
 # ---------------------------------------------------------------------------
-# KPIs principais
+# Main KPIs
 # ---------------------------------------------------------------------------
-st.subheader("KPIs da Carteira")
+st.subheader("Portfolio KPIs")
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
-    st.metric("Contratos", f"{len(df):,}")
+    st.metric("Contracts", f"{len(df):,}")
 with c2:
-    st.metric("EAD Total", f"R$ {df['ead'].sum() / 1e6:.1f}M")
+    st.metric("Total EAD", f"{df['ead'].sum() / 1e6:.1f}M")
 with c3:
-    st.metric("EL Total", f"R$ {df['expected_loss'].sum() / 1e3:.0f}K")
+    st.metric("Total EL", f"{df['expected_loss'].sum() / 1e3:.0f}K")
 with c4:
     el_rate = df["expected_loss"].sum() / df["ead"].sum() * 100
     st.metric("EL Rate", f"{el_rate:.2f}%")
 with c5:
-    st.metric("PD Média", f"{df['pd_true'].mean():.2%}")
+    st.metric("Mean PD", f"{df['pd_true'].mean():.2%}")
 
 st.divider()
 
 # ---------------------------------------------------------------------------
-# Distribuição de risco
+# Risk distribution
 # ---------------------------------------------------------------------------
 col_a, col_b = st.columns(2)
 
 with col_a:
-    st.subheader("Distribuição de PD")
+    st.subheader("PD Distribution")
     fig = px.histogram(
         df,
         x="pd_true",
         nbins=40,
         color="product_type",
-        title="Distribuição de PD por Produto",
-        labels={"pd_true": "PD", "count": "Contratos"},
+        title="PD Distribution by Product",
+        labels={"pd_true": "PD", "count": "Contracts"},
     )
     st.plotly_chart(fig, use_container_width=True)
 
 with col_b:
-    st.subheader("EL por Produto")
+    st.subheader("EL by Product")
     el_prod = el_by_segment(
         df, segment_col="product_type", el_col="expected_loss", ead_col="ead"
     )
@@ -84,15 +84,15 @@ with col_b:
         x="product_type",
         y="el_rate_pct",
         color="product_type",
-        title="Taxa de EL (%) por Produto",
-        labels={"el_rate_pct": "EL Rate (%)", "product_type": "Produto"},
+        title="EL Rate (%) by Product",
+        labels={"el_rate_pct": "EL Rate (%)", "product_type": "Product"},
     )
     st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------------------------------------
-# EL por prazo
+# EL by tenor
 # ---------------------------------------------------------------------------
-st.subheader("Expected Loss por Prazo")
+st.subheader("Expected Loss by Tenor")
 el_tenor = el_by_segment(
     df, segment_col="tenor_months", el_col="expected_loss", ead_col="ead"
 ).sort_values("tenor_months")
@@ -101,15 +101,15 @@ fig = px.line(
     x="tenor_months",
     y="el_rate_pct",
     markers=True,
-    title="EL Rate (%) conforme Prazo do Contrato",
-    labels={"tenor_months": "Prazo (meses)", "el_rate_pct": "EL Rate (%)"},
+    title="EL Rate (%) by Contract Tenor",
+    labels={"tenor_months": "Tenor (months)", "el_rate_pct": "EL Rate (%)"},
 )
 st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------------------------------------
-# Tabela de contratos de maior risco
+# Top-risk contracts table
 # ---------------------------------------------------------------------------
-st.subheader("Top 20 Contratos de Maior Expected Loss")
+st.subheader("Top 20 Contracts by Expected Loss")
 top20 = (
     df[
         [
@@ -126,27 +126,27 @@ top20 = (
     .head(20)
     .reset_index(drop=True)
 )
-top20.columns = ["Cliente", "Produto", "Prazo (m)", "PD", "LGD", "EAD (R$)", "EL (R$)"]
+top20.columns = ["Client", "Product", "Tenor (m)", "PD", "LGD", "EAD", "EL"]
 st.dataframe(
     top20.style.format(
         {
             "PD": "{:.3f}",
             "LGD": "{:.3f}",
-            "EAD (R$)": "R$ {:,.0f}",
-            "EL (R$)": "R$ {:,.0f}",
+            "EAD": "{:,.0f}",
+            "EL": "{:,.0f}",
         }
     ),
     use_container_width=True,
 )
 
 # ---------------------------------------------------------------------------
-# Performance do modelo PD (real — OOS hold-out)
+# PD model performance (real — OOS hold-out)
 # ---------------------------------------------------------------------------
 st.divider()
-st.subheader("Performance do Modelo PD — Out-of-Sample")
+st.subheader("PD Model Performance — Out-of-Sample")
 st.caption(
-    "Métricas calculadas no hold-out 20% que nunca foi visto durante o treino. "
-    "Fonte: modelo LightGBM + Platt treinado na feature store Home Credit."
+    "Metrics calculated on the 20% hold-out never seen during training. "
+    "Source: LightGBM + Isotonic model trained on the Home Credit feature store."
 )
 
 OOS_PATH = PROCESSED_DIR / "oos_predictions.parquet"
@@ -167,14 +167,14 @@ if OOS_PATH.exists():
         st.metric(
             "AUROC (OOS)",
             f"{auroc_val:.4f}",
-            delta="≥ 0.78 ✓" if auroc_val >= 0.78 else f"meta 0.78 — gap {0.78 - auroc_val:.4f}",
+            delta="≥ 0.78 ✓" if auroc_val >= 0.78 else f"target 0.78 — gap {0.78 - auroc_val:.4f}",
             delta_color=color,
         )
     with m2:
         st.metric(
             "Gini (OOS)",
             f"{gini_val:.4f}",
-            delta="padrão indústria de crédito",
+            delta="credit industry standard",
             delta_color="off",
         )
     with m3:
@@ -182,7 +182,7 @@ if OOS_PATH.exists():
         st.metric(
             "KS Stat (OOS)",
             f"{ks_val:.4f}",
-            delta="≥ 0.35 ✓" if ks_val >= 0.35 else f"meta 0.35 — gap {0.35 - ks_val:.4f}",
+            delta="≥ 0.35 ✓" if ks_val >= 0.35 else f"target 0.35 — gap {0.35 - ks_val:.4f}",
             delta_color=color,
         )
     with m4:
@@ -190,54 +190,54 @@ if OOS_PATH.exists():
         st.metric(
             "Brier Score (OOS)",
             f"{brier_val:.4f}",
-            delta="≤ 0.15 ✓" if brier_val <= 0.15 else f"meta 0.15 — gap {brier_val - 0.15:.4f}",
+            delta="≤ 0.15 ✓" if brier_val <= 0.15 else f"target 0.15 — gap {brier_val - 0.15:.4f}",
             delta_color=color,
         )
 
-    # Distribuição de scores por classe
+    # Score distribution by class
     oos_df = pd.DataFrame({"y_true": y_true, "y_pred": y_pred})
-    oos_df["Classe"] = oos_df["y_true"].map({0: "Adimplente", 1: "Default"})
+    oos_df["Class"] = oos_df["y_true"].map({0: "Non-default", 1: "Default"})
     fig_dist = px.histogram(
         oos_df,
         x="y_pred",
-        color="Classe",
+        color="Class",
         nbins=50,
         barmode="overlay",
         opacity=0.7,
-        title="Distribuição de Score PD — OOS Hold-out",
-        labels={"y_pred": "Score PD (probabilidade)", "count": "Contratos"},
-        color_discrete_map={"Adimplente": "steelblue", "Default": "coral"},
+        title="PD Score Distribution — OOS Hold-out",
+        labels={"y_pred": "PD Score (probability)", "count": "Contracts"},
+        color_discrete_map={"Non-default": "steelblue", "Default": "coral"},
     )
     st.plotly_chart(fig_dist, use_container_width=True)
 
     # ---------------------------------------------------------------------------
-    # Testes estatísticos de calibração
+    # Statistical calibration tests
     # ---------------------------------------------------------------------------
     st.divider()
-    st.subheader("Validação Estatística da Calibração")
+    st.subheader("Statistical Calibration Validation")
     st.caption(
-        "Valida se as PDs preditas correspondem às taxas de default observadas — "
-        "fundamento para confiar no EL = PD × LGD × EAD em reais."
+        "Validates whether predicted PDs correspond to observed default rates — "
+        "the foundation for trusting EL = PD × LGD × EAD in currency units."
     )
 
-    tab_hl, tab_bucket = st.tabs(["Hosmer-Lemeshow", "Teste Binomial por Bucket (Basel)"])
+    tab_hl, tab_bucket = st.tabs(["Hosmer-Lemeshow", "Binomial Test by Bucket (Basel)"])
 
     with tab_hl:
         hl_stat, hl_pvalue, hl_table = hosmer_lemeshow_test(y_true, y_pred)
         c1, c2 = st.columns(2)
         with c1:
-            st.metric("Estatística H-L", f"{hl_stat:.2f}")
+            st.metric("H-L Statistic", f"{hl_stat:.2f}")
         with c2:
             color = "normal" if hl_pvalue > 0.05 else "inverse"
             st.metric(
                 "p-value",
                 f"{hl_pvalue:.4f}",
-                delta="calibração OK (p > 0.05)" if hl_pvalue > 0.05 else "miscalibração detectada",
+                delta="calibration OK (p > 0.05)" if hl_pvalue > 0.05 else "miscalibration detected",
                 delta_color=color,
             )
         st.caption(
-            "H0: modelo bem calibrado. Não rejeitar (p > 0.05) é o resultado desejável. "
-            "p-value alto significa que os defaults observados são compatíveis com as PDs preditas."
+            "H0: model is well calibrated. Failing to reject (p > 0.05) is the desired result. "
+            "A high p-value means observed defaults are consistent with predicted PDs."
         )
         display_cols = ["faixa_pd", "contratos", "observed", "expected", "default_rate_obs", "pd_mean", "ratio_obs_exp"]
         available_cols = [c for c in display_cols if c in hl_table.columns]
@@ -260,16 +260,16 @@ if OOS_PATH.exists():
 
         b1, b2, b3 = st.columns(3)
         with b1:
-            st.metric("Verde (p > 0.05)", n_verde)
+            st.metric("Green (p > 0.05)", n_verde)
         with b2:
-            st.metric("Amarelo (0.01–0.05)", n_amarelo)
+            st.metric("Yellow (0.01–0.05)", n_amarelo)
         with b3:
-            st.metric("Vermelho (p ≤ 0.01)", n_vermelho)
+            st.metric("Red (p ≤ 0.01)", n_vermelho)
 
         st.caption(
-            "Teste binomial unilateral: para cada faixa de PD, verifica se o número "
-            "de defaults observados é compatível com a PD média predita. "
-            "Padrão Basel III (Resolução BCB 4.557)."
+            "One-sided binomial test: for each PD bucket, checks whether the number "
+            "of observed defaults is consistent with the mean predicted PD. "
+            "Basel III standard (BCB Resolution 4.557)."
         )
         st.dataframe(
             bucket_result.style.format({
@@ -286,5 +286,5 @@ if OOS_PATH.exists():
         )
 else:
     st.info(
-        "Arquivo OOS não encontrado. Execute `make train` para gerar predições hold-out."
+        "OOS file not found. Run `make train` to generate hold-out predictions."
     )

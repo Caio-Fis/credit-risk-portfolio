@@ -1,4 +1,4 @@
-"""Home — Narrativa do projeto e visão geral."""
+"""Home — Project narrative and overview."""
 
 import streamlit as st
 
@@ -9,98 +9,98 @@ st.set_page_config(
 )
 
 st.title("Credit Risk Portfolio")
-st.subheader("Pipeline end-to-end de risco de crédito para MPE")
+st.subheader("End-to-end credit risk pipeline for SMEs")
 
 st.markdown("""
 ---
 
-## O problema
+## The problem
 
-Instituições financeiras que operam crédito para micro e pequenas empresas enfrentam um paradoxo:
-precisam decidir limite, prazo e taxa **no momento da concessão**, mas os dados mais relevantes
-sobre o tomador — comportamento de pagamento, sazonalidade, dependência de clientes — só aparecem
-meses depois.
+Financial institutions operating credit for micro and small enterprises face a paradox:
+they must decide limits, tenors and rates **at the time of origination**, but the most relevant
+data about the borrower — payment behaviour, seasonality, client dependency — only emerge
+months later.
 
-O **score único** agrava o problema ao colapsar toda essa complexidade num número entre 0 e 1000
-que ignora o contexto da operação.
+The **single score** aggravates the problem by collapsing all this complexity into a number between 0 and 1000
+that ignores the context of the operation.
 
-> Um score 650 pode ser adequado para capital de giro de 30 dias e completamente inadequado
-> para um investimento de 48 meses. **O mesmo CNPJ, riscos radicalmente diferentes.**
+> A score of 650 may be adequate for 30-day working capital and completely inadequate
+> for a 48-month investment. **Same client, radically different risks.**
 
 ---
 
-## A solução
+## The solution
 
-Pipeline end-to-end que transforma dados cadastrais, transacionais e macroeconômicos em:
+End-to-end pipeline that transforms registration, transactional and macroeconomic data into:
 
-| Saída | Descrição |
+| Output | Description |
 |---|---|
-| **PD calibrada** | Probabilidade de default — não ranking, mas probabilidade em escala real |
-| **LGD estimado** | Quanto se perde se o default ocorrer |
-| **Expected Loss** | EL = PD × LGD × EAD em reais por contrato |
-| **Score contextual** | Mesmo cliente avaliado diferente para produtos diferentes |
-| **Alertas de drift** | PSI automatizado — aviso quando a população muda |
+| **Calibrated PD** | Probability of default — not a ranking, but a probability on a real scale |
+| **Estimated LGD** | How much is lost if default occurs |
+| **Expected Loss** | EL = PD × LGD × EAD in currency units per contract |
+| **Contextual score** | Same client assessed differently for different products |
+| **Drift alerts** | Automated PSI — warning when the population changes |
 
 ---
 
-## Módulos
+## Modules
 """)
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
     st.info("""
-    **Módulo 1 — Pipeline Core**
+    **Module 1 — Core Pipeline**
 
-    LightGBM + Platt scaling para PD.
-    Regressão Beta para LGD.
-    Expected Loss em R$ por contrato.
-    SHAP por decisão.
+    LightGBM + isotonic calibration for PD.
+    Beta regression for LGD.
+    Expected Loss per contract.
+    SHAP per decision.
     """)
 
 with col2:
     st.warning("""
-    **Módulo 2 — Early Warning**
+    **Module 2 — Early Warning**
 
-    PSI por feature com alertas automáticos.
-    Análise de safra por coorte.
-    Queda de score > 50pts em 30 dias.
-    Gatilhos comportamentais.
+    PSI per feature with automatic alerts.
+    Vintage analysis by cohort.
+    Score drop > 50pts in 30 days.
+    Behavioural triggers.
     """)
 
 with col3:
     st.success("""
-    **Módulo 3 — Score Contextual**
+    **Module 3 — Contextual Score**
 
-    Dataset sintético com DGP documentado.
-    Produto e prazo como features, não filtros.
-    Demonstração quantitativa da limitação
-    do score único.
+    Synthetic dataset with documented DGP.
+    Product and tenor as features, not filters.
+    Quantitative demonstration of the limitations
+    of the single score.
     """)
 
 st.markdown("""
 ---
 
-## Navegue pelas páginas
+## Navigate the pages
 
-Use o menu à esquerda para explorar cada módulo:
+Use the left menu to explore each module:
 
-- **Concessão**: Simulador de análise de crédito
-- **Portfolio**: Dashboard de carteira com KPIs
-- **Early Warning**: Alertas de deterioração
-- **Explicabilidade**: SHAP waterfall por contrato
-- **Score Contextual**: Mesmo cliente, produtos diferentes
+- **Origination**: Credit analysis simulator
+- **Portfolio**: Portfolio dashboard with KPIs
+- **Early Warning**: Deterioration alerts
+- **Explainability**: SHAP waterfall per contract
+- **Contextual Score**: Same client, different products
 
 ---
 
-## Decisões técnicas
+## Technical decisions
 
-**PD e LGD como modelos separados**: o custo de errar em cada dimensão é diferente.
-PD alta com LGD baixa (garantia real) tem expected loss menor que PD média com LGD alta.
+**PD and LGD as separate models**: the cost of error in each dimension is different.
+High PD with low LGD (real collateral) has lower expected loss than medium PD with high LGD.
 
-**LightGBM com calibração de Platt**: gradient boosting produz bom ranking mas probabilidades
-mal calibradas. Para calcular EL em reais, você precisa de probabilidade em escala real.
+**LightGBM with isotonic calibration**: gradient boosting produces good ranking but poorly
+calibrated probabilities. To compute EL in currency units, you need probability on a real scale.
 
-**Score único não é errado — é insuficiente**: ele vira uma feature entre muitas no modelo
-contextual.
+**Single score is not wrong — it is insufficient**: it becomes one feature among many in the
+contextual model.
 """)

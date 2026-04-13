@@ -1,13 +1,13 @@
-"""Ajuste fino de hiperparâmetros do modelo PD via Optuna.
+"""PD model hyperparameter fine-tuning via Optuna.
 
-Estratégia:
-- Objetivo: AUROC por CV 5-fold no split de treino (80% dos dados)
-- O split OOS (20%) permanece intocado durante a busca — avaliado só no final
-- Foco: parâmetros de regularização, pois o gap train/OOS é ~0.13 (overfitting)
-- 50 trials Bayesian (TPE sampler), pruning com MedianPruner
-- Resultado: novos LGBM_PARAMS para substituir em pd_model.py
+Strategy:
+- Objective: AUROC via 5-fold CV on the train split (80% of data)
+- The OOS split (20%) remains untouched during the search — evaluated only at the end
+- Focus: regularisation parameters, since the train/OOS gap is ~0.13 (overfitting)
+- 50 Bayesian trials (TPE sampler), pruning with MedianPruner
+- Result: new LGBM_PARAMS to replace in pd_model.py
 
-Uso:
+Usage:
     uv run python -m src.models.tune_pd
     make tune
 """
@@ -33,7 +33,7 @@ SEED = 42
 
 
 def _objective(trial: optuna.Trial, X_train, y_train) -> float:
-    """Objetivo Optuna: CV AUROC no split de treino."""
+    """Optuna objective: CV AUROC on the train split."""
     params = {
         "n_estimators": trial.suggest_int("n_estimators", 200, 1000, step=100),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.1, log=True),
@@ -56,13 +56,13 @@ def _objective(trial: optuna.Trial, X_train, y_train) -> float:
 
 
 def tune_pd_hyperparams(n_trials: int = N_TRIALS) -> dict:
-    """Executa busca Bayesian de hiperparâmetros e retorna os melhores params.
+    """Runs Bayesian hyperparameter search and returns the best params.
 
     Args:
-        n_trials: Número de trials Optuna.
+        n_trials: Number of Optuna trials.
 
     Returns:
-        Dicionário com melhores hiperparâmetros para LGBMClassifier.
+        Dictionary with best hyperparameters for LGBMClassifier.
     """
     df = load_feature_store()
     X, _ = _prepare_features(df)
@@ -89,18 +89,18 @@ def tune_pd_hyperparams(n_trials: int = N_TRIALS) -> dict:
 
     best = study.best_params
     best_cv = study.best_value
-    logger.success(f"Melhor CV AUROC (train): {best_cv:.4f}")
-    logger.info(f"Melhores parâmetros:\n{best}")
+    logger.success(f"Best CV AUROC (train): {best_cv:.4f}")
+    logger.info(f"Best params:\n{best}")
 
-    # Avalia com calibração no OOS — estimativa honesta
+    # Evaluate with calibration on OOS — honest estimate
     best_lgbm = LGBMClassifier(**{**best, "random_state": SEED, "n_jobs": 2, "verbose": -1})
     calibrated = CalibratedClassifierCV(best_lgbm, method="isotonic", cv=3)
     calibrated.fit(X_train, y_train)
     y_pred_oos = calibrated.predict_proba(X_test)[:, 1]
     auroc_oos = roc_auc_score(y_test, y_pred_oos)
-    logger.success(f"AUROC OOS com melhores params: {auroc_oos:.4f} (meta ≥ 0.78)")
+    logger.success(f"OOS AUROC with best params: {auroc_oos:.4f} (target ≥ 0.78)")
 
-    # Loga resultado no MLflow
+    # Log result to MLflow
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_PD)
     with mlflow.start_run(run_name="optuna_tuning"):
@@ -116,15 +116,15 @@ if __name__ == "__main__":
     best_params, auroc_oos = tune_pd_hyperparams()
 
     print("\n" + "=" * 60)
-    print("SUBSTITUA LGBM_PARAMS em src/models/pd_model.py por:")
+    print("REPLACE LGBM_PARAMS in src/models/pd_model.py with:")
     print("=" * 60)
     for k, v in sorted(best_params.items()):
         if isinstance(v, float):
             print(f'    "{k}": {v:.6f},')
         else:
             print(f'    "{k}": {v},')
-    print(f"\nAUROC OOS esperado: {auroc_oos:.4f}")
+    print(f"\nExpected OOS AUROC: {auroc_oos:.4f}")
     if auroc_oos >= 0.78:
-        print("✓ Meta 0.78 atingida")
+        print("✓ Target 0.78 reached")
     else:
-        print(f"✗ Ainda abaixo — gap: {0.78 - auroc_oos:.4f}")
+        print(f"✗ Still below target — gap: {0.78 - auroc_oos:.4f}")

@@ -1,21 +1,21 @@
-"""Modelo de Loss Given Default (LGD).
+"""Loss Given Default (LGD) model.
 
-Arquitetura:
-- Regressão Beta via statsmodels — variável resposta em [0, 1]
-- Tratado como problema separado do PD: o custo de erro em LGD é distinto
-- NÃO colapsar PD e LGD num score único
+Architecture:
+- Beta regression via statsmodels — response variable in [0, 1]
+- Treated as a problem separate from PD: the cost of error in LGD is distinct
+- DO NOT collapse PD and LGD into a single score
 
-LGD = 1 - taxa_de_recuperação
-- LGD = 0: recuperação total (sem perda)
-- LGD = 1: perda total (sem recuperação)
+LGD = 1 - recovery_rate
+- LGD = 0: full recovery (no loss)
+- LGD = 1: total loss (no recovery)
 
-Para o dataset Home Credit, onde LGD observado não está disponível diretamente,
-geramos um proxy com base em características da operação (garantia, tipo de contrato).
+For the Home Credit dataset, where observed LGD is not directly available,
+we generate a proxy based on operational characteristics (collateral, contract type).
 
-Funções principais:
-- train_lgd: treina regressão Beta e loga no MLflow
-- predict_lgd: retorna LGD estimado por contrato
-- load_lgd_model: carrega modelo do MLflow
+Main functions:
+- train_lgd: trains Beta regression and logs to MLflow
+- predict_lgd: returns estimated LGD per contract
+- load_lgd_model: loads model from MLflow
 """
 
 from typing import Any
@@ -35,24 +35,24 @@ from src.config import (
 )
 
 LGD_COL = "lgd"
-BETA_EPS = 1e-6  # evita 0 e 1 exatos (beta regression requer (0,1) estrito)
+BETA_EPS = 1e-6  # avoids exact 0 and 1 (beta regression requires strict (0,1))
 
 
 def _generate_lgd_proxy(df: pd.DataFrame) -> pd.Series:
-    """Gera LGD proxy para Home Credit (sem LGD real observado).
+    """Generates LGD proxy for Home Credit (no real observed LGD).
 
-    Proxy baseado em características conhecidas da operação:
-    - Operações sem garantia → LGD mais alto (0.6–0.9)
-    - Tipo de crédito revolvente → LGD intermediário (0.4–0.7)
-    - Com garantia real → LGD baixo (0.1–0.4)
+    Proxy based on known operational characteristics:
+    - Unsecured operations → higher LGD (0.6–0.9)
+    - Revolving credit type → intermediate LGD (0.4–0.7)
+    - With collateral → low LGD (0.1–0.4)
 
-    Este proxy é explicitamente documentado como sintético.
-    Em produção, substituir por taxa de recuperação observada.
+    This proxy is explicitly documented as synthetic.
+    In production, replace with observed recovery rate.
     """
     rng = np.random.default_rng(42)
     n = len(df)
 
-    # Determina faixa de LGD por tipo de contrato
+    # Determine LGD range by contract type
     lgd = np.zeros(n)
 
     if "NAME_CONTRACT_TYPE" in df.columns:
@@ -62,18 +62,18 @@ def _generate_lgd_proxy(df: pd.DataFrame) -> pd.Series:
     else:
         lgd = rng.uniform(0.3, 0.7, n)
 
-    # Modula pelo score externo: ext_source_mean alto → LGD menor
+    # Modulate by external score: high ext_source_mean → lower LGD
     if "ext_source_mean" in df.columns:
         ext = df["ext_source_mean"].fillna(0.5).values
         lgd = lgd * (1 - 0.3 * ext)
 
-    # Clipa para (0, 1) estrito (beta regression)
+    # Clip to strict (0, 1) (beta regression)
     lgd = np.clip(lgd, BETA_EPS, 1 - BETA_EPS)
     return pd.Series(lgd, index=df.index, name=LGD_COL)
 
 
 def _prepare_lgd_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Seleciona e prepara features para o modelo LGD."""
+    """Selects and prepares features for the LGD model."""
     lgd_feature_cols = [
         "AMT_CREDIT",
         "AMT_INCOME_TOTAL",
@@ -97,10 +97,10 @@ def _prepare_lgd_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _reconstruct_beta_wrapper(state: dict) -> "BetaRegressionWrapper":
-    """Reconstrói BetaRegressionWrapper a partir do estado serializado.
+    """Reconstructs BetaRegressionWrapper from serialised state.
 
-    Função de módulo necessária para __reduce__: cloudpickle exige que a função
-    de reconstrução seja importável pelo nome, não pode ser lambda nem closure.
+    Module-level function required for __reduce__: cloudpickle requires that the
+    reconstruction function be importable by name, not a lambda or closure.
     """
     obj = object.__new__(BetaRegressionWrapper)
     obj._feature_cols = state["feature_cols"]
@@ -112,12 +112,12 @@ def _reconstruct_beta_wrapper(state: dict) -> "BetaRegressionWrapper":
 
 
 class BetaRegressionWrapper:
-    """Wrapper scikit-learn-like em torno da regressão Beta do statsmodels.
+    """Scikit-learn-like wrapper around statsmodels Beta regression.
 
-    Implementa __reduce__ para serialização segura via pickle/cloudpickle:
-    o GLMResultsWrapper do statsmodels guarda file handles internos que
-    bloqueiam o cloudpickle. __reduce__ garante que apenas os coeficientes
-    (params) sejam serializados, reconstruindo a predição com link logit.
+    Implements __reduce__ for safe serialisation via pickle/cloudpickle:
+    statsmodels GLMResultsWrapper stores internal file handles that
+    block cloudpickle. __reduce__ ensures only the coefficients
+    (params) are serialised, reconstructing prediction with the logit link.
     """
 
     def __init__(self) -> None:
@@ -139,9 +139,9 @@ class BetaRegressionWrapper:
                 ).Binomial(),
             ).fit(disp=False)
         except Exception:
-            # Fallback: Ridge regression com link logit manual
+            # Fallback: Ridge regression with manual logit link
             logger.warning(
-                "Beta regression via statsmodels falhou. Usando Ridge com link logit."
+                "Beta regression via statsmodels failed. Using Ridge with logit link."
             )
             self._model = Ridge(alpha=1.0)
             self._model.fit(X, np.log(y / (1 - y)))  # logit(LGD)
@@ -154,8 +154,8 @@ class BetaRegressionWrapper:
             return np.clip(1 / (1 + np.exp(-logit_pred)), BETA_EPS, 1 - BETA_EPS)
 
         if isinstance(self._model, dict):
-            # Reconstruído do __setstate__: aplica link logit manualmente
-            # Binomial GLM com link logit: μ = sigmoid(Intercept + X @ β)
+            # Reconstructed from __setstate__: applies logit link manually
+            # Binomial GLM with logit link: μ = sigmoid(Intercept + X @ β)
             params = self._model["params"]
             coef = np.array(
                 [params.get("Intercept", 0.0)]
@@ -167,7 +167,7 @@ class BetaRegressionWrapper:
             eta = X_mat @ coef
             return np.clip(1 / (1 + np.exp(-eta)), BETA_EPS, 1 - BETA_EPS)
 
-        # GLMResultsWrapper ainda na memória (antes da serialização)
+        # GLMResultsWrapper still in memory (before serialisation)
         data = X[self._feature_cols].copy()
         return np.clip(self._model.predict(data), BETA_EPS, 1 - BETA_EPS)
 
@@ -175,10 +175,10 @@ class BetaRegressionWrapper:
         return {}
 
     def __reduce__(self) -> tuple:
-        """Serialização segura para pickle e cloudpickle.
+        """Safe serialisation for pickle and cloudpickle.
 
-        cloudpickle prioriza __reduce__ sobre __getstate__/__setstate__.
-        Retorna apenas os coeficientes — sem file handles do statsmodels.
+        cloudpickle prioritises __reduce__ over __getstate__/__setstate__.
+        Returns only coefficients — without statsmodels file handles.
         """
         if isinstance(self._model, Ridge):
             state = {
@@ -193,7 +193,7 @@ class BetaRegressionWrapper:
                 "params": self._model["params"],
             }
         else:
-            # GLMResultsWrapper: extrai só coeficientes (sem file handles)
+            # GLMResultsWrapper: extract only coefficients (without file handles)
             state = {
                 "model_type": "glm_params",
                 "feature_cols": self._feature_cols,
@@ -206,28 +206,28 @@ def train_lgd(
     df: pd.DataFrame,
     run_name: str = "beta_regression",
 ) -> BetaRegressionWrapper:
-    """Treina regressão Beta para LGD e loga no MLflow.
+    """Trains Beta regression for LGD and logs to MLflow.
 
     Args:
-        df: Feature store (usa proxy LGD se coluna 'lgd' ausente).
-        run_name: Nome do run no MLflow.
+        df: Feature store (uses LGD proxy if 'lgd' column is absent).
+        run_name: MLflow run name.
 
     Returns:
-        Modelo LGD treinado.
+        Trained LGD model.
     """
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_LGD)
 
-    # Garante coluna de LGD
+    # Ensure LGD column exists
     if LGD_COL not in df.columns:
-        logger.warning("Coluna 'lgd' ausente — gerando proxy sintético (documentado).")
+        logger.warning("Column 'lgd' absent — generating synthetic proxy (documented).")
         df = df.copy()
         df[LGD_COL] = _generate_lgd_proxy(df)
 
     X = _prepare_lgd_features(df)
     y = df[LGD_COL].clip(BETA_EPS, 1 - BETA_EPS)
 
-    logger.info(f"Treinando LGD — {len(y):,} amostras. LGD médio: {y.mean():.3f}")
+    logger.info(f"Training LGD — {len(y):,} samples. Mean LGD: {y.mean():.3f}")
 
     model = BetaRegressionWrapper()
 
@@ -249,15 +249,15 @@ def train_lgd(
         mlflow.log_metric("mae", mae)
         logger.info(f"LGD — R²: {r2:.4f}, MAE: {mae:.4f}")
 
-        # GLMResultsWrapper do statsmodels tem file handles internos que bloqueiam
-        # o cloudpickle do MLflow. Converte para dict de params antes de serializar;
-        # predict() já trata o caso dict (reconstrução via link logit).
+        # statsmodels GLMResultsWrapper has internal file handles that block
+        # MLflow cloudpickle. Convert to params dict before serialising;
+        # predict() already handles the dict case (reconstruction via logit link).
         if hasattr(model._model, "params"):
             model._model = {"params": model._model.params.to_dict()}
 
-        # cloudpickle falha com o file sink do loguru (modo 'a') nos globals do
-        # módulo. pickle padrão serializa classes importáveis por nome, sem
-        # percorrer globals — resolve o PicklingError do cloudpickle.
+        # cloudpickle fails with loguru's file sink (mode 'a') in module globals.
+        # Standard pickle serialises importable classes by name, without
+        # traversing globals — resolves the cloudpickle PicklingError.
         mlflow.sklearn.log_model(
             model,
             artifact_path="lgd_model",
@@ -265,7 +265,7 @@ def train_lgd(
         )
         run_id = mlflow.active_run().info.run_id
 
-    logger.success(f"Modelo LGD treinado. Run ID: {run_id}")
+    logger.success(f"LGD model trained. Run ID: {run_id}")
     return model
 
 
@@ -273,19 +273,19 @@ def predict_lgd(
     model: BetaRegressionWrapper,
     df: pd.DataFrame,
 ) -> np.ndarray:
-    """Retorna LGD estimado por contrato.
+    """Returns estimated LGD per contract.
 
     Args:
-        model: Modelo treinado via train_lgd().
-        df: DataFrame de features.
+        model: Model trained via train_lgd().
+        df: Features DataFrame.
 
     Returns:
-        Array de LGD estimado em [0, 1].
+        Array of estimated LGD in [0, 1].
     """
     X = _prepare_lgd_features(df)
     lgd = model.predict(X)
     logger.debug(
-        f"LGD predito: min={lgd.min():.4f}, max={lgd.max():.4f}, mean={lgd.mean():.4f}"
+        f"LGD predicted: min={lgd.min():.4f}, max={lgd.max():.4f}, mean={lgd.mean():.4f}"
     )
     return lgd
 

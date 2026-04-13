@@ -1,30 +1,30 @@
-"""Gatilhos comportamentais para early warning.
+"""Behavioural triggers for early warning.
 
-Complementa a trajetória de score com sinais operacionais que indicam
-deterioração antes que o score capture:
+Complements the score trajectory with operational signals that indicate
+deterioration before the score captures it:
 
-- Queda de volume transacional: redução de receita/NF-e emitidas
-- Protestos: registro de protesto em cartório
-- Atrasos em outras obrigações: DPD crescente em outras operações
+- Transaction volume drop: reduction in revenue / invoices issued
+- Protests: protest registration at a notary
+- Delays in other obligations: rising DPD in other operations
 
-No dataset Home Credit, esses sinais são aproximados por:
-- Queda no número de parcelas pagas no mês (installments)
-- Aumento de DPD em bureau_balance
-- Aumento de contratos com status "Bad debt" no bureau
+In the Home Credit dataset, these signals are approximated by:
+- Drop in the number of installments paid in the month
+- Increase in DPD in bureau_balance
+- Increase in contracts with "Bad debt" status in bureau
 
-Funções principais:
-- flag_volume_drop: queda de volume transacional
-- flag_protests: protestos / bad debt no bureau
-- aggregate_signals: agrega todos os sinais em score de risco composto
+Main functions:
+- flag_volume_drop: transaction volume drop
+- flag_protests: protests / bad debt in bureau
+- aggregate_signals: aggregates all signals into a composite risk score
 """
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 
-# Thresholds de volume (configuráveis)
-VOLUME_DROP_PCT = 0.30  # queda de 30% no volume → alerta
-PROTEST_FLAG_THRESHOLD = 1  # qualquer protesto → alerta
+# Volume thresholds (configurable)
+VOLUME_DROP_PCT = 0.30  # 30% volume drop → alert
+PROTEST_FLAG_THRESHOLD = 1  # any protest → alert
 
 
 def flag_volume_drop(
@@ -35,24 +35,24 @@ def flag_volume_drop(
     window_months: int = 3,
     threshold_pct: float = VOLUME_DROP_PCT,
 ) -> pd.DataFrame:
-    """Detecta queda brusca no volume de transações/pagamentos.
+    """Detects sharp drop in transaction/payment volume.
 
-    Compara o volume médio dos últimos `window_months` com o período anterior.
+    Compares the mean volume over the last `window_months` with the prior period.
 
     Args:
-        df: DataFrame com histórico de volumes por entidade e mês.
-        entity_col: Coluna de identificador da entidade.
-        volume_col: Coluna de volume mensal (ex: pagamentos realizados).
-        date_col: Coluna de data de referência.
-        window_months: Janela de comparação em meses.
-        threshold_pct: Percentual de queda que dispara o alerta.
+        df: DataFrame with volume history per entity and month.
+        entity_col: Entity identifier column.
+        volume_col: Monthly volume column (e.g.: payments made).
+        date_col: Reference date column.
+        window_months: Comparison window in months.
+        threshold_pct: Drop percentage that triggers the alert.
 
     Returns:
-        DataFrame com entidades em alerta de queda de volume.
+        DataFrame with entities in volume drop alert.
     """
     for col in (entity_col, volume_col, date_col):
         if col not in df.columns:
-            raise KeyError(f"Coluna '{col}' não encontrada.")
+            raise KeyError(f"Column '{col}' not found.")
 
     df = df.copy()
     df[date_col] = pd.to_datetime(df[date_col])
@@ -82,7 +82,7 @@ def flag_volume_drop(
 
     result = pd.DataFrame(alerts)
     logger.info(
-        f"Volume drop: {len(result)} entidades em alerta (>{threshold_pct:.0%})"
+        f"Volume drop: {len(result)} entities in alert (>{threshold_pct:.0%})"
     )
     return result
 
@@ -93,24 +93,24 @@ def flag_protests(
     status_col: str = "CREDIT_ACTIVE",
     bad_status_values: list[str] | None = None,
 ) -> pd.DataFrame:
-    """Detecta contratos com status de protesto ou bad debt no bureau.
+    """Detects contracts with protest or bad debt status in the bureau.
 
-    No Home Credit, usa CREDIT_ACTIVE == 'Bad debt' como proxy de protesto.
+    In Home Credit, uses CREDIT_ACTIVE == 'Bad debt' as a protest proxy.
 
     Args:
-        bureau_df: DataFrame do bureau com status de créditos ativos.
-        entity_col: Coluna de identificador.
-        status_col: Coluna de status do crédito no bureau.
-        bad_status_values: Valores que indicam protesto/bad debt.
+        bureau_df: Bureau DataFrame with active credit statuses.
+        entity_col: Identifier column.
+        status_col: Credit status column in the bureau.
+        bad_status_values: Values that indicate protest/bad debt.
 
     Returns:
-        DataFrame com entidades com protesto, ordenado por contagem.
+        DataFrame with protested entities, sorted by count.
     """
     if bad_status_values is None:
         bad_status_values = ["Bad debt", "Sold"]
 
     if status_col not in bureau_df.columns:
-        logger.warning(f"Coluna '{status_col}' não encontrada. Sem sinal de protesto.")
+        logger.warning(f"Column '{status_col}' not found. No protest signal.")
         return pd.DataFrame(columns=[entity_col, "protest_count", "signal_protest"])
 
     bad_df = bureau_df[bureau_df[status_col].isin(bad_status_values)]
@@ -122,7 +122,7 @@ def flag_protests(
         .assign(signal_protest=True)
     )
 
-    logger.info(f"Protestos: {len(result)} entidades com bad debt/sold no bureau")
+    logger.info(f"Protests: {len(result)} entities with bad debt/sold in bureau")
     return result
 
 
@@ -132,23 +132,23 @@ def aggregate_signals(
     protest_alerts: pd.DataFrame | None = None,
     entity_col: str = "SK_ID_CURR",
 ) -> pd.DataFrame:
-    """Agrega todos os sinais em um score de risco composto por entidade.
+    """Aggregates all signals into a composite risk score per entity.
 
-    Score composto (0–3):
-    - +1 se queda de score > threshold
-    - +1 se queda de volume > threshold
-    - +1 se protesto/bad debt no bureau
+    Composite score (0–3):
+    - +1 if score drop > threshold
+    - +1 if volume drop > threshold
+    - +1 if protest/bad debt in bureau
 
     Args:
-        trajectory_alerts: Resultado de flag_score_drop().
-        volume_alerts: Resultado de flag_volume_drop() (opcional).
-        protest_alerts: Resultado de flag_protests() (opcional).
-        entity_col: Coluna de identificador.
+        trajectory_alerts: Result of flag_score_drop().
+        volume_alerts: Result of flag_volume_drop() (optional).
+        protest_alerts: Result of flag_protests() (optional).
+        entity_col: Identifier column.
 
     Returns:
-        DataFrame com entidades em alerta, score composto e sinais ativos.
+        DataFrame with entities in alert, composite score and active signals.
     """
-    # Base: entidades com queda de score
+    # Base: entities with score drop
     base = trajectory_alerts[[entity_col, "score_drop", "alert_level"]].copy()
     base["signal_score"] = True
     base["composite_risk"] = 1
@@ -181,12 +181,12 @@ def aggregate_signals(
         base["composite_risk"]
         .map(
             {
-                1: "moderado",
-                2: "alto",
-                3: "crítico",
+                1: "moderate",
+                2: "high",
+                3: "critical",
             }
         )
-        .fillna("moderado")
+        .fillna("moderate")
     )
 
     result = base.sort_values(
@@ -194,10 +194,10 @@ def aggregate_signals(
     ).reset_index(drop=True)
 
     logger.warning(
-        f"Alerta composto: {len(result)} entidades | "
-        f"crítico={(result['composite_risk'] == 3).sum()} | "
-        f"alto={(result['composite_risk'] == 2).sum()} | "
-        f"moderado={(result['composite_risk'] == 1).sum()}"
+        f"Composite alert: {len(result)} entities | "
+        f"critical={(result['composite_risk'] == 3).sum()} | "
+        f"high={(result['composite_risk'] == 2).sum()} | "
+        f"moderate={(result['composite_risk'] == 1).sum()}"
     )
     return result
 
@@ -207,27 +207,27 @@ def simulate_behavioral_data(
     n_months: int = 12,
     seed: int = 42,
 ) -> pd.DataFrame:
-    """Gera dados sintéticos de comportamento para demonstração.
+    """Generates synthetic behavioural data for demonstration.
 
     Args:
-        n_entities: Número de entidades.
-        n_months: Número de meses de histórico.
-        seed: Semente aleatória.
+        n_entities: Number of entities.
+        n_months: Number of months of history.
+        seed: Random seed.
 
     Returns:
-        DataFrame com entity_id, reference_date, pd_score, monthly_payment_count.
+        DataFrame with entity_id, reference_date, pd_score, monthly_payment_count.
     """
     rng = np.random.default_rng(seed)
     records = []
     base_date = pd.Timestamp("2023-01-01")
 
     for i in range(n_entities):
-        # Score inicial (500–900)
+        # Initial score (500–900)
         score_init = rng.integers(500, 900)
-        # Trend: 80% estável, 15% queda, 5% melhora
+        # Trend: 80% stable, 15% drop, 5% improve
         trend_type = rng.choice(["stable", "drop", "improve"], p=[0.80, 0.15, 0.05])
 
-        # Volume de pagamentos mensal
+        # Monthly payment volume
         vol_base = rng.integers(3, 15)
 
         for m in range(n_months):

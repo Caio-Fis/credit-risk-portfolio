@@ -1,17 +1,17 @@
-"""Análise de safra (vintage analysis).
+"""Vintage analysis.
 
-Mede a inadimplência acumulada por coorte de originação e maturidade.
-Permite identificar se o modelo está deteriorando ou se a carteira mudou.
+Measures cumulative default rate by origination cohort and maturity.
+Allows identifying whether the model is deteriorating or the portfolio has changed.
 
-Terminologia:
-- Safra (vintage): mês de originação do contrato
-- Maturidade: meses desde a originação
-- DPD: Days Past Due (dias em atraso)
+Terminology:
+- Vintage: origination month of the contract
+- Maturity: months since origination
+- DPD: Days Past Due
 
-Funções principais:
-- build_vintage_matrix: constrói matriz de inadimplência (safra × maturidade)
-- plot_vintage_curves: plota curvas de inadimplência por safra
-- compare_vintages: compara safras novas vs antigas
+Main functions:
+- build_vintage_matrix: builds default matrix (vintage × maturity)
+- plot_vintage_curves: plots default curves by vintage
+- compare_vintages: compares recent vs. older vintages
 """
 
 from pathlib import Path
@@ -30,23 +30,23 @@ def build_vintage_matrix(
     default_col: str = "is_default",
     min_observations: int = 30,
 ) -> pd.DataFrame:
-    """Constrói matriz de inadimplência acumulada por safra e maturidade.
+    """Builds cumulative default matrix by vintage and maturity.
 
     Args:
-        df: DataFrame com colunas de safra, maturidade e flag de default.
-        vintage_col: Coluna indicando o período de originação.
-        maturity_col: Coluna com meses desde a originação.
-        default_col: Coluna binária (1 = default ocorreu até este mês).
-        min_observations: Safras com menos amostras são excluídas.
+        df: DataFrame with vintage, maturity, and default flag columns.
+        vintage_col: Column indicating the origination period.
+        maturity_col: Column with months since origination.
+        default_col: Binary column (1 = default occurred up to this month).
+        min_observations: Vintages with fewer samples are excluded.
 
     Returns:
-        Pivot table: linhas = safra, colunas = maturidade, valores = taxa de default.
+        Pivot table: rows = vintage, columns = maturity, values = default rate.
     """
     for col in (vintage_col, maturity_col, default_col):
         if col not in df.columns:
-            raise KeyError(f"Coluna '{col}' não encontrada no DataFrame.")
+            raise KeyError(f"Column '{col}' not found in DataFrame.")
 
-    # Filtra safras com observações suficientes
+    # Filter vintages with sufficient observations
     vintage_counts = df.groupby(vintage_col)[default_col].count()
     valid_vintages = vintage_counts[vintage_counts >= min_observations].index
     df_filtered = df[df[vintage_col].isin(valid_vintages)]
@@ -54,10 +54,10 @@ def build_vintage_matrix(
     if len(df_filtered) < len(df):
         n_removed = len(df) - len(df_filtered)
         logger.warning(
-            f"{n_removed} registros removidos (safras com < {min_observations} obs)."
+            f"{n_removed} records removed (vintages with < {min_observations} obs)."
         )
 
-    # Taxa de default acumulada por safra × maturidade
+    # Cumulative default rate by vintage × maturity
     matrix = (
         df_filtered.groupby([vintage_col, maturity_col])[default_col]
         .mean()
@@ -65,11 +65,11 @@ def build_vintage_matrix(
         .sort_index()
     )
 
-    # Garante monoticidade: taxa de default é acumulada
+    # Ensure monotonicity: default rate is cumulative
     matrix = matrix.cummax(axis=1)
 
     logger.info(
-        f"Vintage matrix: {matrix.shape[0]} safras × {matrix.shape[1]} maturidades"
+        f"Vintage matrix: {matrix.shape[0]} vintages × {matrix.shape[1]} maturities"
     )
     return matrix
 
@@ -79,15 +79,15 @@ def plot_vintage_curves(
     highlight_recent: int = 3,
     save_path: Path | None = None,
 ) -> plt.Figure:
-    """Plota curvas de inadimplência por safra.
+    """Plots default curves by vintage.
 
     Args:
-        vintage_matrix: Resultado de build_vintage_matrix().
-        highlight_recent: Número de safras mais recentes a destacar.
-        save_path: Se fornecido, salva a figura.
+        vintage_matrix: Result of build_vintage_matrix().
+        highlight_recent: Number of most recent vintages to highlight.
+        save_path: If provided, saves the figure.
 
     Returns:
-        Figura matplotlib.
+        Matplotlib figure.
     """
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -107,20 +107,20 @@ def plot_vintage_curves(
             label=str(vintage) if is_recent else None,
         )
 
-    ax.set_xlabel("Maturidade (meses)")
-    ax.set_ylabel("Taxa de Default Acumulada (%)")
-    ax.set_title("Análise de Safra — Inadimplência por Coorte de Originação")
+    ax.set_xlabel("Maturity (months)")
+    ax.set_ylabel("Cumulative Default Rate (%)")
+    ax.set_title("Vintage Analysis — Default Rate by Origination Cohort")
     ax.grid(alpha=0.3)
 
     if highlight_recent > 0:
-        ax.legend(title="Safras recentes", loc="upper left")
+        ax.legend(title="Recent vintages", loc="upper left")
 
     plt.tight_layout()
 
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
-        logger.info(f"Vintage curves salvo em {save_path}")
+        logger.info(f"Vintage curves saved at {save_path}")
 
     return fig
 
@@ -130,23 +130,23 @@ def compare_vintages(
     reference_period: int = 6,
     comparison_maturity: int = 12,
 ) -> pd.DataFrame:
-    """Compara taxa de default em maturidade fixa entre safras.
+    """Compares default rate at a fixed maturity across vintages.
 
-    Útil para identificar deterioração ao longo do tempo.
+    Useful for identifying deterioration over time.
 
     Args:
-        vintage_matrix: Resultado de build_vintage_matrix().
-        reference_period: Número de safras antigas a usar como referência.
-        comparison_maturity: Maturidade (meses) usada para comparação.
+        vintage_matrix: Result of build_vintage_matrix().
+        reference_period: Number of older vintages to use as reference.
+        comparison_maturity: Maturity (months) used for comparison.
 
     Returns:
-        DataFrame com default rate por safra na maturidade especificada.
+        DataFrame with default rate per vintage at the specified maturity.
     """
     if comparison_maturity not in vintage_matrix.columns:
         available = vintage_matrix.columns.tolist()
         nearest = min(available, key=lambda x: abs(x - comparison_maturity))
         logger.warning(
-            f"Maturidade {comparison_maturity} não disponível. Usando {nearest}."
+            f"Maturity {comparison_maturity} not available. Using {nearest}."
         )
         comparison_maturity = nearest
 
@@ -158,7 +158,7 @@ def compare_vintages(
     rates["vs_reference_pp"] = (rates["default_rate"] - ref_rate) * 100
 
     logger.info(
-        f"Taxa de referência (primeiras {reference_period} safras) em {comparison_maturity}m: "
+        f"Reference rate (first {reference_period} vintages) at {comparison_maturity}m: "
         f"{ref_rate:.2%}"
     )
 
@@ -171,33 +171,33 @@ def simulate_vintage_data(
     max_maturity: int = 24,
     seed: int = 42,
 ) -> pd.DataFrame:
-    """Gera dados sintéticos de safra para demonstração.
+    """Generates synthetic vintage data for demonstration.
 
-    Simula deterioração gradual: safras mais novas têm PD ligeiramente maior.
+    Simulates gradual deterioration: newer vintages have slightly higher PD.
 
     Args:
-        n_contracts: Total de contratos.
-        n_vintages: Número de safras (meses).
-        max_maturity: Maturidade máxima em meses.
-        seed: Semente aleatória.
+        n_contracts: Total number of contracts.
+        n_vintages: Number of vintages (months).
+        max_maturity: Maximum maturity in months.
+        seed: Random seed.
 
     Returns:
-        DataFrame com vintage, maturity_month, is_default.
+        DataFrame with vintage, maturity_month, is_default.
     """
     rng = np.random.default_rng(seed)
     records = []
 
     base_pd = 0.08
-    drift_per_vintage = 0.005  # deterioração de 0.5pp por safra
+    drift_per_vintage = 0.005  # 0.5pp deterioration per vintage
 
     contracts_per_vintage = n_contracts // n_vintages
 
     for v in range(n_vintages):
         vintage_pd = base_pd + v * drift_per_vintage
-        maturities_observed = n_vintages - v  # safras mais novas têm menos histórico
+        maturities_observed = n_vintages - v  # newer vintages have less history
 
         for _ in range(contracts_per_vintage):
-            # Mês de default (se ocorrer)
+            # Default month (if it occurs)
             default_month = (
                 int(rng.geometric(p=vintage_pd / max_maturity))
                 if rng.random() < vintage_pd

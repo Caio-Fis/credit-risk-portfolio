@@ -1,14 +1,14 @@
-"""Agregações em batch sobre tabelas grandes usando pandas chunked read.
+"""Batch aggregations over large tables using pandas chunked read.
 
-Substitui as funções pandas que carregavam 27M + 13.6M linhas inteiras na RAM.
-A estratégia é processar os CSVs em lotes de 1M linhas, acumular resultados
-parciais e combinar no final — o pico de memória cai de ~4 GB para ~200 MB.
+Replaces pandas functions that loaded 27M + 13.6M rows entirely into RAM.
+The strategy is to process CSVs in batches of 1M rows, accumulate partial
+results, and combine at the end — peak memory drops from ~4 GB to ~200 MB.
 
-Funções principais:
-- build_bureau_features_batch: agrega bureau_balance (27M linhas) por janela
-- build_installment_features_batch: agrega installments (13.6M linhas) por janela
-- build_pos_cash_features_batch: agrega POS_CASH_balance (10M linhas) por janela
-- build_credit_card_features_batch: agrega credit_card_balance (3.8M linhas) por janela
+Main functions:
+- build_bureau_features_batch: aggregates bureau_balance (27M rows) by window
+- build_installment_features_batch: aggregates installments (13.6M rows) by window
+- build_pos_cash_features_batch: aggregates POS_CASH_balance (10M rows) by window
+- build_credit_card_features_batch: aggregates credit_card_balance (3.8M rows) by window
 """
 
 from pathlib import Path
@@ -26,41 +26,41 @@ def build_bureau_features_batch(
     windows: list[int] | None = None,
     chunksize: int = _DEFAULT_CHUNKSIZE,
 ) -> pd.DataFrame:
-    """Agrega features de bureau por janela temporal em modo batch.
+    """Aggregates bureau features by time window in batch mode.
 
-    A bureau.csv (1.7M linhas) é carregada inteira — é pequena o suficiente.
-    A bureau_balance.csv (27.3M linhas) é lida em chunks de `chunksize` linhas.
+    bureau.csv (1.7M rows) is loaded entirely — it is small enough.
+    bureau_balance.csv (27.3M rows) is read in chunks of `chunksize` rows.
 
-    Estratégia por métrica:
-    - cnt_credits (nunique SK_ID_BUREAU): acumula set de bureau_ids vistos por janela;
-      a contagem final é o tamanho do set, sem duplicações entre chunks.
-    - cnt_overdue (sum is_overdue): soma parcial por chunk é aditiva; basta somar.
+    Strategy per metric:
+    - cnt_credits (nunique SK_ID_BUREAU): accumulates set of bureau_ids seen per window;
+      the final count is the set size, without duplicates across chunks.
+    - cnt_overdue (sum is_overdue): partial sum per chunk is additive; just sum.
 
     Args:
-        bureau_path: Caminho para bureau.csv.
-        bureau_bal_path: Caminho para bureau_balance.csv.
-        windows: Janelas em dias, ex: [30, 90, 365].
-        chunksize: Linhas por chunk ao ler bureau_balance.
+        bureau_path: Path to bureau.csv.
+        bureau_bal_path: Path to bureau_balance.csv.
+        windows: Windows in days, e.g.: [30, 90, 365].
+        chunksize: Rows per chunk when reading bureau_balance.
 
     Returns:
-        DataFrame pandas com SK_ID_CURR + features por janela.
+        Pandas DataFrame with SK_ID_CURR + features per window.
     """
     if windows is None:
         windows = [30, 90, 365]
 
-    # bureau.csv cabe na RAM: 1.7M linhas × 2 colunas ~ 14 MB
-    logger.info("Batch bureau: carregando bureau.csv (1.7M linhas)...")
+    # bureau.csv fits in RAM: 1.7M rows × 2 columns ~ 14 MB
+    logger.info("Batch bureau: loading bureau.csv (1.7M rows)...")
     bureau = pd.read_csv(bureau_path, usecols=["SK_ID_CURR", "SK_ID_BUREAU"])
     id_map: dict[int, int] = bureau.set_index("SK_ID_BUREAU")["SK_ID_CURR"].to_dict()
     del bureau
 
-    # Acumuladores cross-chunk por janela
+    # Cross-chunk accumulators per window
     seen_bureaus: dict[int, set] = {w: set() for w in windows}  # → cnt_credits
     overdue_chunks: dict[int, list] = {w: [] for w in windows}  # → cnt_overdue
 
     n_chunks = 0
     logger.info(
-        f"Batch bureau: lendo bureau_balance.csv em chunks de {chunksize:,} linhas..."
+        f"Batch bureau: reading bureau_balance.csv in chunks of {chunksize:,} rows..."
     )
     for chunk in pd.read_csv(
         bureau_bal_path,
@@ -78,20 +78,20 @@ def build_bureau_features_batch(
             if sub.empty:
                 continue
 
-            # cnt_credits: rastreia bureaus únicos (não aditivo entre chunks)
+            # cnt_credits: tracks unique bureaus (not additive across chunks)
             seen_bureaus[w].update(sub["SK_ID_BUREAU"].unique())
 
-            # cnt_overdue: soma parcial (aditivo entre chunks)
+            # cnt_overdue: partial sum (additive across chunks)
             overdue_chunk = sub.groupby("SK_ID_CURR")["is_overdue"].sum()
             overdue_chunks[w].append(overdue_chunk)
 
         n_chunks += 1
 
-    logger.info(f"Batch bureau: processados {n_chunks} chunks. Combinando resultados...")
+    logger.info(f"Batch bureau: processed {n_chunks} chunks. Combining results...")
 
     result = None
     for w in windows:
-        # cnt_credits: mapeia bureaus vistos → clientes → conta por cliente
+        # cnt_credits: maps seen bureaus → clients → count per client
         seen_df = pd.DataFrame({"SK_ID_BUREAU": list(seen_bureaus[w])})
         seen_df["SK_ID_CURR"] = seen_df["SK_ID_BUREAU"].map(id_map)
         cnt_credits = (
@@ -101,7 +101,7 @@ def build_bureau_features_batch(
             .reset_index(name=f"bureau_cnt_credits_{w}d")
         )
 
-        # cnt_overdue: soma total entre chunks
+        # cnt_overdue: total sum across chunks
         cnt_overdue = (
             pd.concat(overdue_chunks[w])
             .groupby(level=0)
@@ -115,7 +115,7 @@ def build_bureau_features_batch(
 
     assert result is not None
     df = result.fillna(0)
-    logger.info(f"Bureau features: {df.shape[0]:,} clientes × {df.shape[1]} colunas")
+    logger.info(f"Bureau features: {df.shape[0]:,} clients × {df.shape[1]} columns")
     return df
 
 
@@ -124,27 +124,27 @@ def build_installment_features_batch(
     windows: list[int] | None = None,
     chunksize: int = _DEFAULT_CHUNKSIZE,
 ) -> pd.DataFrame:
-    """Calcula DPD por janela temporal em modo batch.
+    """Calculates DPD by time window in batch mode.
 
-    installments_payments.csv (13.6M linhas) é lida em chunks de `chunksize`.
+    installments_payments.csv (13.6M rows) is read in chunks of `chunksize`.
 
-    Estratégia por métrica:
-    - dpd_mean: acumula soma e contagem separadamente; combina no final.
-    - dpd_max: max parcial é combinável via max.
-    - dpd_cnt_positive: contagem parcial é aditiva.
+    Strategy per metric:
+    - dpd_mean: accumulates sum and count separately; combines at the end.
+    - dpd_max: partial max is combinable via max.
+    - dpd_cnt_positive: partial count is additive.
 
     Args:
-        inst_path: Caminho para installments_payments.csv.
-        windows: Janelas em dias, ex: [30, 90, 365].
-        chunksize: Linhas por chunk ao ler installments_payments.
+        inst_path: Path to installments_payments.csv.
+        windows: Windows in days, e.g.: [30, 90, 365].
+        chunksize: Rows per chunk when reading installments_payments.
 
     Returns:
-        DataFrame pandas com SK_ID_CURR + features por janela.
+        Pandas DataFrame with SK_ID_CURR + features per window.
     """
     if windows is None:
         windows = [30, 90, 365]
 
-    # Acumuladores por janela — listas de Series agregadas por chunk
+    # Accumulators per window — lists of per-chunk aggregated Series
     sum_chunks: dict[int, list] = {w: [] for w in windows}
     count_chunks: dict[int, list] = {w: [] for w in windows}
     max_chunks: dict[int, list] = {w: [] for w in windows}
@@ -152,7 +152,7 @@ def build_installment_features_batch(
 
     n_chunks = 0
     logger.info(
-        f"Batch installments: lendo installments_payments.csv em chunks de {chunksize:,} linhas..."
+        f"Batch installments: reading installments_payments.csv in chunks of {chunksize:,} rows..."
     )
     for chunk in pd.read_csv(
         inst_path,
@@ -172,7 +172,7 @@ def build_installment_features_batch(
             sum_chunks[w].append(g.sum().rename("dpd_sum"))
             count_chunks[w].append(g.count().rename("dpd_count"))
             max_chunks[w].append(g.max().rename("dpd_max"))
-            # dpd_cnt_positive: filtra antes de contar para evitar lambda
+            # dpd_cnt_positive: filter before counting to avoid lambda
             pos_sub = sub[sub["DPD"] > 0]
             if not pos_sub.empty:
                 pos_chunks[w].append(
@@ -182,7 +182,7 @@ def build_installment_features_batch(
         n_chunks += 1
 
     logger.info(
-        f"Batch installments: processados {n_chunks} chunks. Combinando resultados..."
+        f"Batch installments: processed {n_chunks} chunks. Combining results..."
     )
 
     result = None
@@ -196,7 +196,7 @@ def build_installment_features_batch(
             else pd.Series(dtype=float, name="dpd_pos")
         )
 
-        # Alinha índices para operações vetorizadas
+        # Align indices for vectorised operations
         common_idx = dpd_sum.index
         dpd_pos = dpd_pos.reindex(common_idx, fill_value=0)
 
@@ -212,7 +212,7 @@ def build_installment_features_batch(
 
     assert result is not None
     df = result.fillna(0)
-    logger.info(f"Installment features: {df.shape[0]:,} clientes × {df.shape[1]} colunas")
+    logger.info(f"Installment features: {df.shape[0]:,} clients × {df.shape[1]} columns")
     return df
 
 
@@ -221,28 +221,28 @@ def build_pos_cash_features_batch(
     windows: list[int] | None = None,
     chunksize: int = _DEFAULT_CHUNKSIZE,
 ) -> pd.DataFrame:
-    """Agrega features de POS_CASH_balance por janela temporal em modo batch.
+    """Aggregates POS_CASH_balance features by time window in batch mode.
 
-    POS_CASH_balance.csv (10M linhas): snapshots mensais de empréstimos
-    parcelados e de caixa. Janelas em meses: 30d≈1m, 90d≈3m, 365d≈12m.
+    POS_CASH_balance.csv (10M rows): monthly snapshots of instalment
+    and cash loans. Windows in months: 30d≈1m, 90d≈3m, 365d≈12m.
 
-    Features extraídas por janela:
-    - pos_dpd_mean: média de SK_DPD por cliente
-    - pos_dpd_max: máximo de SK_DPD por cliente
-    - pos_cnt_dpd_positive: meses com SK_DPD > 0
+    Features extracted per window:
+    - pos_dpd_mean: mean SK_DPD per client
+    - pos_dpd_max: maximum SK_DPD per client
+    - pos_cnt_dpd_positive: months with SK_DPD > 0
 
     Args:
-        pos_path: Caminho para POS_CASH_balance.csv.
-        windows: Janelas em dias; convertido para meses internamente.
-        chunksize: Linhas por chunk.
+        pos_path: Path to POS_CASH_balance.csv.
+        windows: Windows in days; converted to months internally.
+        chunksize: Rows per chunk.
 
     Returns:
-        DataFrame com SK_ID_CURR + features por janela.
+        DataFrame with SK_ID_CURR + features per window.
     """
     if windows is None:
         windows = [30, 90, 365]
 
-    # MONTHS_BALANCE é negativo (ex: -1 = mês passado); janela_meses = -(days//30)
+    # MONTHS_BALANCE is negative (e.g.: -1 = last month); window_months = -(days//30)
     window_months = {w: -(w // 30) for w in windows}
 
     sum_chunks: dict[int, list] = {w: [] for w in windows}
@@ -252,7 +252,7 @@ def build_pos_cash_features_batch(
 
     n_chunks = 0
     logger.info(
-        f"Batch POS_CASH: lendo POS_CASH_balance.csv em chunks de {chunksize:,} linhas..."
+        f"Batch POS_CASH: reading POS_CASH_balance.csv in chunks of {chunksize:,} rows..."
     )
     for chunk in pd.read_csv(
         pos_path,
@@ -276,7 +276,7 @@ def build_pos_cash_features_batch(
 
         n_chunks += 1
 
-    logger.info(f"Batch POS_CASH: processados {n_chunks} chunks. Combinando...")
+    logger.info(f"Batch POS_CASH: processed {n_chunks} chunks. Combining...")
 
     result = None
     for w in windows:
@@ -305,7 +305,7 @@ def build_pos_cash_features_batch(
     if result is None:
         result = pd.DataFrame(columns=["SK_ID_CURR"])
     df = result.fillna(0)
-    logger.info(f"POS_CASH features: {df.shape[0]:,} clientes × {df.shape[1]} colunas")
+    logger.info(f"POS_CASH features: {df.shape[0]:,} clients × {df.shape[1]} columns")
     return df
 
 
@@ -314,22 +314,22 @@ def build_credit_card_features_batch(
     windows: list[int] | None = None,
     chunksize: int = _DEFAULT_CHUNKSIZE,
 ) -> pd.DataFrame:
-    """Agrega features de credit_card_balance por janela temporal em modo batch.
+    """Aggregates credit_card_balance features by time window in batch mode.
 
-    credit_card_balance.csv (3.8M linhas): snapshots mensais de cartão de crédito.
+    credit_card_balance.csv (3.8M rows): monthly credit card snapshots.
 
-    Features extraídas por janela:
-    - cc_utilization_mean: utilização média (AMT_BALANCE / AMT_CREDIT_LIMIT_ACTUAL)
-    - cc_dpd_max: máximo de SK_DPD
-    - cc_cnt_dpd_positive: meses com SK_DPD > 0
+    Features extracted per window:
+    - cc_utilization_mean: mean utilisation (AMT_BALANCE / AMT_CREDIT_LIMIT_ACTUAL)
+    - cc_dpd_max: maximum SK_DPD
+    - cc_cnt_dpd_positive: months with SK_DPD > 0
 
     Args:
-        cc_path: Caminho para credit_card_balance.csv.
-        windows: Janelas em dias; convertido para meses internamente.
-        chunksize: Linhas por chunk.
+        cc_path: Path to credit_card_balance.csv.
+        windows: Windows in days; converted to months internally.
+        chunksize: Rows per chunk.
 
     Returns:
-        DataFrame com SK_ID_CURR + features por janela.
+        DataFrame with SK_ID_CURR + features per window.
     """
     if windows is None:
         windows = [30, 90, 365]
@@ -343,7 +343,7 @@ def build_credit_card_features_batch(
 
     n_chunks = 0
     logger.info(
-        f"Batch credit_card: lendo credit_card_balance.csv em chunks de {chunksize:,} linhas..."
+        f"Batch credit_card: reading credit_card_balance.csv in chunks of {chunksize:,} rows..."
     )
     for chunk in pd.read_csv(
         cc_path,
@@ -351,7 +351,7 @@ def build_credit_card_features_batch(
         usecols=["SK_ID_CURR", "MONTHS_BALANCE", "AMT_BALANCE",
                  "AMT_CREDIT_LIMIT_ACTUAL", "SK_DPD"],
     ):
-        # Utilização: clipa limite em 1 para evitar divisão por zero
+        # Utilisation: clip limit at 1 to avoid division by zero
         chunk["utilization"] = chunk["AMT_BALANCE"] / chunk["AMT_CREDIT_LIMIT_ACTUAL"].clip(lower=1)
         chunk["utilization"] = chunk["utilization"].clip(0, 1)
 
@@ -374,7 +374,7 @@ def build_credit_card_features_batch(
 
         n_chunks += 1
 
-    logger.info(f"Batch credit_card: processados {n_chunks} chunks. Combinando...")
+    logger.info(f"Batch credit_card: processed {n_chunks} chunks. Combining...")
 
     result = None
     for w in windows:
@@ -403,5 +403,5 @@ def build_credit_card_features_batch(
     if result is None:
         result = pd.DataFrame(columns=["SK_ID_CURR"])
     df = result.fillna(0)
-    logger.info(f"Credit card features: {df.shape[0]:,} clientes × {df.shape[1]} colunas")
+    logger.info(f"Credit card features: {df.shape[0]:,} clients × {df.shape[1]} columns")
     return df

@@ -1,12 +1,12 @@
-"""Explicabilidade por SHAP values.
+"""Explainability via SHAP values.
 
-Gera waterfall por contrato individual e importância global de features.
+Generates waterfall plots per individual contract and global feature importance.
 
-Funções principais:
-- compute_shap: calcula SHAP values para um conjunto de predições
-- waterfall_plot: gera waterfall SHAP para um contrato específico
-- top_features: retorna as N features mais importantes globalmente
-- summary_plot: gráfico de resumo de importância global
+Main functions:
+- compute_shap: calculates SHAP values for a set of predictions
+- waterfall_plot: generates SHAP waterfall for a specific contract
+- top_features: returns the N most globally important features
+- summary_plot: global importance summary plot
 """
 
 from pathlib import Path
@@ -25,57 +25,57 @@ def compute_shap(
     max_explain_samples: int = 2000,
     seed: int = 42,
 ) -> shap.Explanation:
-    """Calcula SHAP values para o conjunto X.
+    """Calculates SHAP values for the dataset X.
 
-    Para CalibratedClassifierCV, extrai o estimador base LightGBM
-    e usa TreeExplainer (mais eficiente que KernelExplainer).
+    For CalibratedClassifierCV, extracts the base LightGBM estimator
+    and uses TreeExplainer (more efficient than KernelExplainer).
 
     Args:
-        model: Modelo treinado (CalibratedClassifierCV ou LGBMClassifier).
-        X: DataFrame de features.
-        background_sample: Tamanho da amostra de background para KernelExplainer.
-        max_explain_samples: Limite de linhas para SHAP. Se X > limite, amostra
-            estratificada por posição (preserva distribuição temporal/de risco).
-            TreeExplainer é O(n × features × depth) — 307K linhas leva ~10min;
-            2000 linhas leva ~2s.
-        seed: Semente para a amostragem.
+        model: Trained model (CalibratedClassifierCV or LGBMClassifier).
+        X: Features DataFrame.
+        background_sample: Background sample size for KernelExplainer.
+        max_explain_samples: Row limit for SHAP. If X > limit, uses uniform
+            random sampling (preserves temporal/risk distribution).
+            TreeExplainer is O(n × features × depth) — 307K rows takes ~10min;
+            2000 rows takes ~2s.
+        seed: Seed for sampling.
 
     Returns:
-        shap.Explanation com values para a classe positiva (default).
+        shap.Explanation with values for the positive class (default).
     """
     from sklearn.calibration import CalibratedClassifierCV
 
-    # Subsample quando X é grande demais para SHAP ser interativo.
-    # TreeExplainer calcula SHAP ponto-a-ponto (sem interação entre amostras),
-    # então amostrar é equivalente a escolher quais contratos explicar.
-    # Importância global = mean(|SHAP|) converge com n~500 (CLT); 2000 é conservador.
-    # Usamos amostragem aleatória uniforme — sem estratificação por classe porque
-    # o dataset contextual sintético é balanceado (~43% default).
-    # Se usar em produção com dataset desbalanceado (<5% default), passe y=target
-    # e implemente stratified sampling explícito.
+    # Subsample when X is too large for SHAP to be interactive.
+    # TreeExplainer computes SHAP point-by-point (no inter-sample interaction),
+    # so sampling is equivalent to choosing which contracts to explain.
+    # Global importance = mean(|SHAP|) converges with n~500 (CLT); 2000 is conservative.
+    # We use uniform random sampling — no class stratification because
+    # the synthetic contextual dataset is balanced (~43% default).
+    # If used in production with imbalanced dataset (<5% default), pass y=target
+    # and implement explicit stratified sampling.
     n_original = len(X)
     if n_original > max_explain_samples:
         rng = np.random.default_rng(seed)
         idx = rng.choice(n_original, size=max_explain_samples, replace=False)
-        idx.sort()  # preserva ordem original
+        idx.sort()  # preserve original order
         X = X.iloc[idx].reset_index(drop=True)
         logger.info(
-            f"SHAP: {n_original:,} → {max_explain_samples:,} linhas. "
-            f"Valores individuais: idênticos. Importância global: erro ≈ σ/√{max_explain_samples}."
+            f"SHAP: {n_original:,} → {max_explain_samples:,} rows. "
+            f"Individual values: identical. Global importance: error ≈ σ/√{max_explain_samples}."
         )
 
-    # Extrai estimador base do wrapper de calibração
+    # Extract base estimator from calibration wrapper
     if isinstance(model, CalibratedClassifierCV):
         base_estimator = model.calibrated_classifiers_[0].estimator
     else:
         base_estimator = model
 
-    logger.info(f"Calculando SHAP values (TreeExplainer) para {len(X)} amostras...")
+    logger.info(f"Computing SHAP values (TreeExplainer) for {len(X)} samples...")
 
     try:
         explainer = shap.TreeExplainer(base_estimator)
         shap_values = explainer(X)
-        # Para classificação binária, pega a classe positiva (índice 1)
+        # For binary classification, take the positive class (index 1)
         if shap_values.values.ndim == 3:
             explanation = shap.Explanation(
                 values=shap_values.values[:, :, 1],
@@ -89,7 +89,7 @@ def compute_shap(
             explanation = shap_values
     except Exception as e:
         logger.warning(
-            f"TreeExplainer falhou ({e}). Usando KernelExplainer (mais lento)."
+            f"TreeExplainer failed ({e}). Falling back to KernelExplainer (slower)."
         )
         background = shap.sample(X, background_sample)
         explainer = shap.KernelExplainer(model.predict_proba, background)
@@ -108,7 +108,7 @@ def compute_shap(
             feature_names=list(X.columns),
         )
 
-    logger.success(f"SHAP values calculados: {explanation.values.shape}")
+    logger.success(f"SHAP values computed: {explanation.values.shape}")
     return explanation
 
 
@@ -118,16 +118,16 @@ def waterfall_plot(
     max_display: int = 15,
     save_path: Path | None = None,
 ) -> plt.Figure:
-    """Gera waterfall SHAP para um contrato específico.
+    """Generates SHAP waterfall plot for a specific contract.
 
     Args:
-        explanation: shap.Explanation do conjunto completo.
-        idx: Índice do contrato no DataFrame.
-        max_display: Número máximo de features a exibir.
-        save_path: Se fornecido, salva a figura neste caminho.
+        explanation: shap.Explanation for the full dataset.
+        idx: Contract index in the DataFrame.
+        max_display: Maximum number of features to display.
+        save_path: If provided, saves the figure to this path.
 
     Returns:
-        Figura matplotlib.
+        Matplotlib figure.
     """
     shap.plots.waterfall(explanation[idx], max_display=max_display, show=False)
     fig = plt.gcf()
@@ -137,7 +137,7 @@ def waterfall_plot(
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
-        logger.info(f"Waterfall plot salvo em {save_path}")
+        logger.info(f"Waterfall plot saved at {save_path}")
 
     return fig
 
@@ -146,16 +146,16 @@ def top_features(
     explanation: shap.Explanation,
     n: int = 10,
 ) -> pd.DataFrame:
-    """Retorna as N features mais importantes por importância SHAP global.
+    """Returns the N most important features by global SHAP importance.
 
-    Importância global = mean(|SHAP values|) por feature.
+    Global importance = mean(|SHAP values|) per feature.
 
     Args:
-        explanation: shap.Explanation do conjunto.
-        n: Número de features a retornar.
+        explanation: shap.Explanation for the dataset.
+        n: Number of features to return.
 
     Returns:
-        DataFrame com colunas: feature, mean_abs_shap (ordenado desc).
+        DataFrame with columns: feature, mean_abs_shap (sorted descending).
     """
     mean_abs = np.abs(explanation.values).mean(axis=0)
     feature_names = explanation.feature_names or [f"f{i}" for i in range(len(mean_abs))]
@@ -167,7 +167,7 @@ def top_features(
         .reset_index(drop=True)
     )
 
-    logger.info(f"Top {n} features por importância SHAP:\n{df.to_string(index=False)}")
+    logger.info(f"Top {n} features by SHAP importance:\n{df.to_string(index=False)}")
     return df
 
 
@@ -176,15 +176,15 @@ def summary_plot(
     max_display: int = 20,
     save_path: Path | None = None,
 ) -> plt.Figure:
-    """Gera summary plot de importância global.
+    """Generates global importance summary plot.
 
     Args:
-        explanation: shap.Explanation do conjunto.
-        max_display: Número máximo de features a exibir.
-        save_path: Se fornecido, salva a figura.
+        explanation: shap.Explanation for the dataset.
+        max_display: Maximum number of features to display.
+        save_path: If provided, saves the figure.
 
     Returns:
-        Figura matplotlib.
+        Matplotlib figure.
     """
     shap.summary_plot(
         explanation.values,
@@ -199,6 +199,6 @@ def summary_plot(
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
-        logger.info(f"Summary plot salvo em {save_path}")
+        logger.info(f"Summary plot saved at {save_path}")
 
     return fig
