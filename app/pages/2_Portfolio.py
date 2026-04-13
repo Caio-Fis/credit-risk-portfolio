@@ -95,7 +95,7 @@ with col_b:
 st.subheader("Expected Loss por Prazo")
 el_tenor = el_by_segment(
     df, segment_col="tenor_months", el_col="expected_loss", ead_col="ead"
-)
+).sort_values("tenor_months")
 fig = px.line(
     el_tenor,
     x="tenor_months",
