@@ -1,0 +1,199 @@
+# Contrato de features — todas as features do pipeline documentadas aqui
+# Campos: name, description, window_days (null se não temporal), source, dtype
+
+features:
+
+  # ---------------------------------------------------------------------------
+  # Features de identidade / cadastro
+  # ---------------------------------------------------------------------------
+  - name: sk_id_curr
+    description: Identificador único do contrato/cliente
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: int64
+
+  - name: target
+    description: "1 = default (pagamento atrasado >90d), 0 = adimplente"
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: int8
+
+  - name: amt_credit
+    description: Valor total do crédito concedido (EAD proxy)
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: float64
+
+  - name: amt_income_total
+    description: Renda anual declarada pelo solicitante
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: float64
+
+  - name: amt_annuity
+    description: Anuidade do empréstimo
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: float64
+
+  - name: days_birth
+    description: Idade em dias (negativo — dias desde o nascimento até a data de referência)
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: int32
+
+  - name: days_employed
+    description: Tempo de emprego em dias (negativo; 365243 = não empregado)
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: int32
+
+  - name: ext_source_1
+    description: Score externo de bureau 1 (normalizado 0–1)
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: float64
+
+  - name: ext_source_2
+    description: Score externo de bureau 2 (normalizado 0–1)
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: float64
+
+  - name: ext_source_3
+    description: Score externo de bureau 3 (normalizado 0–1)
+    window_days: null
+    source: home_credit/application_train.csv
+    dtype: float64
+
+  # ---------------------------------------------------------------------------
+  # Features derivadas — janelas temporais (bureau_balance)
+  # ---------------------------------------------------------------------------
+  - name: bureau_cnt_credits_30d
+    description: Número de créditos ativos nos últimos 30 dias (bureau)
+    window_days: 30
+    source: home_credit/bureau.csv + bureau_balance.csv
+    dtype: int32
+
+  - name: bureau_cnt_credits_90d
+    description: Número de créditos ativos nos últimos 90 dias (bureau)
+    window_days: 90
+    source: home_credit/bureau.csv + bureau_balance.csv
+    dtype: int32
+
+  - name: bureau_cnt_credits_365d
+    description: Número de créditos ativos nos últimos 365 dias (bureau)
+    window_days: 365
+    source: home_credit/bureau.csv + bureau_balance.csv
+    dtype: int32
+
+  - name: bureau_cnt_overdue_30d
+    description: Número de créditos em atraso nos últimos 30 dias
+    window_days: 30
+    source: home_credit/bureau_balance.csv
+    dtype: int32
+
+  - name: bureau_cnt_overdue_90d
+    description: Número de créditos em atraso nos últimos 90 dias
+    window_days: 90
+    source: home_credit/bureau_balance.csv
+    dtype: int32
+
+  - name: bureau_cnt_overdue_365d
+    description: Número de créditos em atraso nos últimos 365 dias
+    window_days: 365
+    source: home_credit/bureau_balance.csv
+    dtype: int32
+
+  - name: prev_cnt_applications_30d
+    description: Número de pedidos de crédito anteriores nos últimos 30 dias
+    window_days: 30
+    source: home_credit/previous_application.csv
+    dtype: int32
+
+  - name: prev_cnt_applications_90d
+    description: Número de pedidos de crédito anteriores nos últimos 90 dias
+    window_days: 90
+    source: home_credit/previous_application.csv
+    dtype: int32
+
+  - name: prev_cnt_refused_90d
+    description: Número de pedidos recusados nos últimos 90 dias
+    window_days: 90
+    source: home_credit/previous_application.csv
+    dtype: int32
+
+  - name: installments_dpd_mean_30d
+    description: Média de dias de atraso nas parcelas dos últimos 30 dias
+    window_days: 30
+    source: home_credit/installments_payments.csv
+    dtype: float64
+
+  - name: installments_dpd_mean_90d
+    description: Média de dias de atraso nas parcelas dos últimos 90 dias
+    window_days: 90
+    source: home_credit/installments_payments.csv
+    dtype: float64
+
+  - name: installments_dpd_max_90d
+    description: Máximo de dias de atraso nas parcelas dos últimos 90 dias
+    window_days: 90
+    source: home_credit/installments_payments.csv
+    dtype: float64
+
+  # ---------------------------------------------------------------------------
+  # Features macroeconômicas (BCB SGS)
+  # ---------------------------------------------------------------------------
+  - name: selic_rate
+    description: Taxa Selic anualizada (%) na data de referência — série BCB 432
+    window_days: null
+    source: bcb_sgs/serie_432
+    dtype: float64
+
+  - name: pj_default_rate
+    description: Taxa de inadimplência PJ (%) — série BCB 21082
+    window_days: null
+    source: bcb_sgs/serie_21082
+    dtype: float64
+
+  - name: ibc_br_yoy
+    description: Variação anual do IBC-Br (proxy de atividade econômica) — série BCB 24364
+    window_days: null
+    source: bcb_sgs/serie_24364
+    dtype: float64
+
+  # ---------------------------------------------------------------------------
+  # Features de LGD (Módulo 1)
+  # ---------------------------------------------------------------------------
+  - name: lgd
+    description: "Loss Given Default observado: (1 - taxa de recuperação). Variável resposta do modelo LGD."
+    window_days: null
+    source: derivado/recovery_rate
+    dtype: float64
+
+  # ---------------------------------------------------------------------------
+  # Features contextuais (Módulo 3 — dataset sintético)
+  # ---------------------------------------------------------------------------
+  - name: product_type
+    description: "Tipo de produto: capital_de_giro | investimento | antecipacao_recebiveis"
+    window_days: null
+    source: synthetic/contextual
+    dtype: category
+
+  - name: tenor_months
+    description: "Prazo do contrato em meses: 1, 3, 6, 12, 24, 36, 48"
+    window_days: null
+    source: synthetic/contextual
+    dtype: int8
+
+  - name: has_collateral
+    description: "1 = contrato com garantia real, 0 = sem garantia"
+    window_days: null
+    source: synthetic/contextual
+    dtype: int8
+
+  - name: pd_single_score
+    description: Score único de PD (output do modelo baseline, usado como feature no modelo contextual)
+    window_days: null
+    source: derived/pd_model
+    dtype: float64
