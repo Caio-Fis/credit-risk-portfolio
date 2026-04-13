@@ -158,8 +158,8 @@ def hosmer_lemeshow_test(
     grouped["default_rate_obs"] = grouped["observed"] / grouped["n"]
     grouped["ratio_obs_exp"] = grouped["observed"] / grouped["expected"].clip(lower=1e-6)
 
-    result = grouped.rename(columns={"bin": "faixa_pd", "n": "contratos"})
-    result["faixa_pd"] = result["faixa_pd"].apply(
+    result = grouped.rename(columns={"bin": "pd_range", "n": "contracts"})
+    result["pd_range"] = result["pd_range"].apply(
         lambda iv: f"({iv.left:.2%}, {iv.right:.2%}]"
     )
 
@@ -219,31 +219,31 @@ def binomial_test_by_bucket(
         p_value = float(binom.sf(observed - 1, n, pd_mean))
 
         if p_value > 0.05:
-            semaforo = "Verde"
+            traffic_light = "Green"
         elif p_value > 0.01:
-            semaforo = "Amarelo"
+            traffic_light = "Yellow"
         else:
-            semaforo = "Vermelho"
+            traffic_light = "Red"
 
         rows.append(
             {
-                "faixa_pd": str(bucket),
-                "contratos": n,
-                "defaults_observados": observed,
-                "defaults_esperados": round(expected, 1),
-                "pd_media_predita": round(pd_mean, 4),
-                "taxa_obs": round(observed / n, 4),
+                "pd_range": str(bucket),
+                "contracts": n,
+                "observed_defaults": observed,
+                "expected_defaults": round(expected, 1),
+                "mean_predicted_pd": round(pd_mean, 4),
+                "observed_rate": round(observed / n, 4),
                 "p_value": round(p_value, 4),
-                "semaforo": semaforo,
+                "traffic_light": traffic_light,
             }
         )
 
     result = pd.DataFrame(rows)
-    n_verde = (result["semaforo"] == "Verde").sum()
-    n_amarelo = (result["semaforo"] == "Amarelo").sum()
-    n_vermelho = (result["semaforo"] == "Vermelho").sum()
+    n_green = (result["traffic_light"] == "Green").sum()
+    n_yellow = (result["traffic_light"] == "Yellow").sum()
+    n_red = (result["traffic_light"] == "Red").sum()
     logger.info(
-        f"Binomial test by bucket: Green={n_verde} | Yellow={n_amarelo} | Red={n_vermelho}"
+        f"Binomial test by bucket: Green={n_green} | Yellow={n_yellow} | Red={n_red}"
     )
     return result
 
@@ -261,8 +261,8 @@ def bucket_calibration_plot(
     Returns:
         Matplotlib figure.
     """
-    colors = {"Verde": "seagreen", "Amarelo": "goldenrod", "Vermelho": "firebrick"}
-    bar_colors = [colors[s] for s in result["semaforo"]]
+    colors = {"Green": "seagreen", "Yellow": "goldenrod", "Red": "firebrick"}
+    bar_colors = [colors[s] for s in result["traffic_light"]]
 
     fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -271,7 +271,7 @@ def bucket_calibration_plot(
 
     ax.bar(
         [i - width / 2 for i in x],
-        result["taxa_obs"] * 100,
+        result["observed_rate"] * 100,
         width,
         label="Observed default rate (%)",
         color=bar_colors,
@@ -279,7 +279,7 @@ def bucket_calibration_plot(
     )
     ax.bar(
         [i + width / 2 for i in x],
-        result["pd_media_predita"] * 100,
+        result["mean_predicted_pd"] * 100,
         width,
         label="Mean predicted PD (%)",
         color="steelblue",
@@ -287,7 +287,7 @@ def bucket_calibration_plot(
     )
 
     ax.set_xticks(list(x))
-    ax.set_xticklabels(result["faixa_pd"], rotation=20, ha="right")
+    ax.set_xticklabels(result["pd_range"], rotation=20, ha="right")
     ax.set_ylabel("Default rate (%)")
     ax.set_title("Calibration by Bucket — Basel Binomial Test (traffic light = observed)")
     ax.legend()
@@ -297,12 +297,12 @@ def bucket_calibration_plot(
     for i, row in result.iterrows():
         ax.text(
             i - width / 2,
-            row["taxa_obs"] * 100 + 0.1,
+            row["observed_rate"] * 100 + 0.1,
             f"p={row['p_value']:.3f}",
             ha="center",
             va="bottom",
             fontsize=8,
-            color=colors[row["semaforo"]],
+            color=colors[row["traffic_light"]],
             fontweight="bold",
         )
 
@@ -439,9 +439,9 @@ def full_evaluation(
     metrics["hl_pvalue"] = hl_pvalue
 
     bucket_result = binomial_test_by_bucket(y_true, y_proba)
-    metrics["buckets_verdes"] = int((bucket_result["semaforo"] == "Verde").sum())
-    metrics["buckets_amarelos"] = int((bucket_result["semaforo"] == "Amarelo").sum())
-    metrics["buckets_vermelhos"] = int((bucket_result["semaforo"] == "Vermelho").sum())
+    metrics["green_buckets"] = int((bucket_result["traffic_light"] == "Green").sum())
+    metrics["yellow_buckets"] = int((bucket_result["traffic_light"] == "Yellow").sum())
+    metrics["red_buckets"] = int((bucket_result["traffic_light"] == "Red").sum())
 
     if save_plots:
         calibration_plot(

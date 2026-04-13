@@ -239,7 +239,7 @@ if OOS_PATH.exists():
             "H0: model is well calibrated. Failing to reject (p > 0.05) is the desired result. "
             "A high p-value means observed defaults are consistent with predicted PDs."
         )
-        display_cols = ["faixa_pd", "contratos", "observed", "expected", "default_rate_obs", "pd_mean", "ratio_obs_exp"]
+        display_cols = ["pd_range", "contracts", "observed", "expected", "default_rate_obs", "pd_mean", "ratio_obs_exp"]
         available_cols = [c for c in display_cols if c in hl_table.columns]
         st.dataframe(
             hl_table[available_cols].style.format({
@@ -254,17 +254,17 @@ if OOS_PATH.exists():
     with tab_bucket:
         bucket_result = binomial_test_by_bucket(y_true, y_pred)
 
-        n_verde = (bucket_result["semaforo"] == "Verde").sum()
-        n_amarelo = (bucket_result["semaforo"] == "Amarelo").sum()
-        n_vermelho = (bucket_result["semaforo"] == "Vermelho").sum()
+        n_green = (bucket_result["traffic_light"] == "Green").sum()
+        n_yellow = (bucket_result["traffic_light"] == "Yellow").sum()
+        n_red = (bucket_result["traffic_light"] == "Red").sum()
 
         b1, b2, b3 = st.columns(3)
         with b1:
-            st.metric("Green (p > 0.05)", n_verde)
+            st.metric("Green (p > 0.05)", n_green)
         with b2:
-            st.metric("Yellow (0.01–0.05)", n_amarelo)
+            st.metric("Yellow (0.01–0.05)", n_yellow)
         with b3:
-            st.metric("Red (p ≤ 0.01)", n_vermelho)
+            st.metric("Red (p ≤ 0.01)", n_red)
 
         st.caption(
             "One-sided binomial test: for each PD bucket, checks whether the number "
@@ -273,14 +273,14 @@ if OOS_PATH.exists():
         )
         st.dataframe(
             bucket_result.style.format({
-                "pd_media_predita": "{:.3f}",
-                "taxa_obs": "{:.3f}",
+                "mean_predicted_pd": "{:.3f}",
+                "observed_rate": "{:.3f}",
                 "p_value": "{:.4f}",
             }).applymap(
-                lambda v: "background-color: #d4edda" if v == "Verde"
-                else ("background-color: #fff3cd" if v == "Amarelo"
+                lambda v: "background-color: #d4edda" if v == "Green"
+                else ("background-color: #fff3cd" if v == "Yellow"
                 else "background-color: #f8d7da"),
-                subset=["semaforo"],
+                subset=["traffic_light"],
             ),
             use_container_width=True,
         )
