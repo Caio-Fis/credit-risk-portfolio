@@ -10,7 +10,11 @@ Funções principais:
 - auroc: Area Under ROC Curve
 - ks_stat: Kolmogorov-Smirnov statistic
 - brier_score: Brier Score
+- gini: coeficiente de Gini (= 2×AUROC − 1), padrão da indústria de crédito
+- hosmer_lemeshow: teste formal de calibração (H-L chi-squared)
+- binomial_test_by_bucket: teste binomial por faixa de PD (padrão Basel)
 - calibration_plot: gera e salva o gráfico de calibração
+- bucket_calibration_plot: gráfico de calibração por bucket com semáforo Basel
 - full_evaluation: roda todas as métricas e retorna dicionário
 """
 
@@ -20,6 +24,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from loguru import logger
+from scipy import stats
+from scipy.stats import binom
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import (
     RocCurveDisplay,
@@ -84,6 +90,227 @@ def brier_score(y_true: np.ndarray, y_proba: np.ndarray) -> float:
     score = brier_score_loss(y_true, y_proba)
     logger.info(f"Brier Score: {score:.4f}")
     return score
+
+
+def gini(y_true: np.ndarray, y_proba: np.ndarray) -> float:
+    """Coeficiente de Gini: discriminação no padrão da indústria de crédito.
+
+    Gini = 2 × AUROC − 1, mapeado para [−1, 1].
+    Interpretação prática:
+    - < 0.30: fraco
+    - 0.30–0.50: razoável
+    - 0.50–0.70: bom (padrão de mercado para crédito PJ)
+    - > 0.70: excelente
+
+    Args:
+        y_true: Labels verdadeiros (0/1).
+        y_proba: Probabilidades preditas.
+
+    Returns:
+        Coeficiente de Gini em [−1, 1].
+    """
+    score = 2 * roc_auc_score(y_true, y_proba) - 1
+    logger.info(f"Gini: {score:.4f}")
+    return score
+
+
+def hosmer_lemeshow_test(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    n_bins: int = 10,
+) -> tuple[float, float, pd.DataFrame]:
+    """Teste de Hosmer-Lemeshow: valida calibração da PD formalmente.
+
+    Agrupa observações em decis de probabilidade predita e aplica
+    teste chi-squared comparando defaults observados vs. esperados.
+
+    H0: modelo está bem calibrado (não rejeitar é desejável).
+    p-value > 0.05 → calibração aceitável.
+    p-value < 0.05 → evidência de miscalibração sistemática.
+
+    Relevância para EL: se H-L rejeita, as PDs preditas estão sistematicamente
+    erradas em alguma faixa — o EL calculado em reais não será confiável.
+
+    Args:
+        y_true: Labels verdadeiros.
+        y_proba: Probabilidades preditas.
+        n_bins: Número de grupos (decis por padrão).
+
+    Returns:
+        Tupla (hl_statistic, p_value, tabela_por_grupo).
+    """
+    df = pd.DataFrame({"y": y_true, "p": y_proba})
+    df["bin"] = pd.qcut(df["p"], q=n_bins, duplicates="drop")
+
+    grouped = (
+        df.groupby("bin", observed=True)
+        .agg(n=("y", "count"), observed=("y", "sum"), expected=("p", "sum"))
+        .reset_index()
+    )
+
+    # Estatística H-L: sum((O - E)^2 / (E × (1 - E/n)))
+    denom = grouped["expected"] * (1 - grouped["expected"] / grouped["n"])
+    hl_stat = float(((grouped["observed"] - grouped["expected"]) ** 2 / denom).sum())
+    df_freedom = len(grouped) - 2
+    p_value = float(1 - stats.chi2.cdf(hl_stat, df_freedom))
+
+    grouped["pd_mean"] = grouped["expected"] / grouped["n"]
+    grouped["default_rate_obs"] = grouped["observed"] / grouped["n"]
+    grouped["ratio_obs_exp"] = grouped["observed"] / grouped["expected"].clip(lower=1e-6)
+
+    result = grouped.rename(columns={"bin": "faixa_pd", "n": "contratos"})
+
+    logger.info(
+        f"Hosmer-Lemeshow: H={hl_stat:.2f}, df={df_freedom}, p={p_value:.4f} "
+        f"→ {'calibração OK' if p_value > 0.05 else 'ATENÇÃO: miscalibração detectada'}"
+    )
+    return hl_stat, p_value, result
+
+
+def binomial_test_by_bucket(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    buckets: list[float] | None = None,
+) -> pd.DataFrame:
+    """Teste binomial por faixa de PD — abordagem Basel III traffic light.
+
+    Para cada bucket de PD predita, testa se o número de defaults observados
+    é compatível com a PD média predita via teste binomial unilateral.
+
+    Semáforo:
+    - Verde  (p > 0.05): calibração aceitável para essa faixa
+    - Amarelo (0.01 < p ≤ 0.05): investigar — desvio significativo
+    - Vermelho (p ≤ 0.01): miscalibração confirmada — retreino necessário
+
+    Usado por bancos para validar modelos IRB (Internal Ratings-Based)
+    perante o Banco Central (Basileia III, art. 143 da Resolução 4.557).
+
+    Args:
+        y_true: Labels verdadeiros.
+        y_proba: Probabilidades preditas.
+        buckets: Limites das faixas de PD (ex: [0, 0.02, 0.05, 0.10, 0.20, 1.0]).
+
+    Returns:
+        DataFrame com resultado do teste por faixa.
+    """
+    if buckets is None:
+        buckets = [0.0, 0.02, 0.05, 0.10, 0.20, 1.0]
+
+    labels = [
+        f"{a:.0%}–{b:.0%}" for a, b in zip(buckets[:-1], buckets[1:])
+    ]
+
+    df = pd.DataFrame({"y": y_true, "p": y_proba})
+    df["bucket"] = pd.cut(df["p"], bins=buckets, labels=labels, include_lowest=True)
+
+    rows = []
+    for bucket, group in df.groupby("bucket", observed=True):
+        n = len(group)
+        if n == 0:
+            continue
+        observed = int(group["y"].sum())
+        pd_mean = float(group["p"].mean())
+        expected = pd_mean * n
+
+        # Teste unilateral: P(X ≥ observado | n, pd_mean)
+        p_value = float(binom.sf(observed - 1, n, pd_mean))
+
+        if p_value > 0.05:
+            semaforo = "Verde"
+        elif p_value > 0.01:
+            semaforo = "Amarelo"
+        else:
+            semaforo = "Vermelho"
+
+        rows.append(
+            {
+                "faixa_pd": str(bucket),
+                "contratos": n,
+                "defaults_observados": observed,
+                "defaults_esperados": round(expected, 1),
+                "pd_media_predita": round(pd_mean, 4),
+                "taxa_obs": round(observed / n, 4),
+                "p_value": round(p_value, 4),
+                "semaforo": semaforo,
+            }
+        )
+
+    result = pd.DataFrame(rows)
+    n_verde = (result["semaforo"] == "Verde").sum()
+    n_amarelo = (result["semaforo"] == "Amarelo").sum()
+    n_vermelho = (result["semaforo"] == "Vermelho").sum()
+    logger.info(
+        f"Teste binomial por bucket: Verde={n_verde} | Amarelo={n_amarelo} | Vermelho={n_vermelho}"
+    )
+    return result
+
+
+def bucket_calibration_plot(
+    result: pd.DataFrame,
+    save_path: Path | None = None,
+) -> plt.Figure:
+    """Gráfico de calibração por bucket com semáforo Basel.
+
+    Args:
+        result: DataFrame retornado por binomial_test_by_bucket().
+        save_path: Se fornecido, salva a figura.
+
+    Returns:
+        Figura matplotlib.
+    """
+    colors = {"Verde": "seagreen", "Amarelo": "goldenrod", "Vermelho": "firebrick"}
+    bar_colors = [colors[s] for s in result["semaforo"]]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    x = range(len(result))
+    width = 0.35
+
+    ax.bar(
+        [i - width / 2 for i in x],
+        result["taxa_obs"] * 100,
+        width,
+        label="Default rate observada (%)",
+        color=bar_colors,
+        alpha=0.85,
+    )
+    ax.bar(
+        [i + width / 2 for i in x],
+        result["pd_media_predita"] * 100,
+        width,
+        label="PD média predita (%)",
+        color="steelblue",
+        alpha=0.6,
+    )
+
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(result["faixa_pd"], rotation=20, ha="right")
+    ax.set_ylabel("Taxa de default (%)")
+    ax.set_title("Calibração por Bucket — Teste Binomial Basel (semáforo = observado)")
+    ax.legend()
+    ax.grid(axis="y", alpha=0.3)
+
+    # Anotações de p-value e semáforo
+    for i, row in result.iterrows():
+        ax.text(
+            i - width / 2,
+            row["taxa_obs"] * 100 + 0.1,
+            f"p={row['p_value']:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            color=colors[row["semaforo"]],
+            fontweight="bold",
+        )
+
+    plt.tight_layout()
+
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        logger.info(f"Bucket calibration plot salvo em {save_path}")
+
+    return fig
 
 
 def calibration_plot(
@@ -189,6 +416,7 @@ def full_evaluation(
     """
     metrics = {
         "auroc": auroc(y_true, y_proba),
+        "gini": gini(y_true, y_proba),
         "ks": ks_stat(y_true, y_proba),
         "brier_score": brier_score(y_true, y_proba),
         "avg_precision": average_precision_score(y_true, y_proba),
@@ -202,11 +430,24 @@ def full_evaluation(
         status = "OK" if ok else "ABAIXO DA META"
         logger.info(f"  {metric}: {val:.4f} (meta {direction} {target}) → {status}")
 
+    # Testes estatísticos de calibração
+    hl_stat, hl_pvalue, _ = hosmer_lemeshow_test(y_true, y_proba)
+    metrics["hl_statistic"] = hl_stat
+    metrics["hl_pvalue"] = hl_pvalue
+
+    bucket_result = binomial_test_by_bucket(y_true, y_proba)
+    metrics["buckets_verdes"] = int((bucket_result["semaforo"] == "Verde").sum())
+    metrics["buckets_amarelos"] = int((bucket_result["semaforo"] == "Amarelo").sum())
+    metrics["buckets_vermelhos"] = int((bucket_result["semaforo"] == "Vermelho").sum())
+
     if save_plots:
         calibration_plot(
             y_true, y_proba, save_path=artifact_dir / "calibration_plot.png"
         )
         roc_plot(y_true, y_proba, save_path=artifact_dir / "roc_curve.png")
+        bucket_calibration_plot(
+            bucket_result, save_path=artifact_dir / "bucket_calibration.png"
+        )
 
     return metrics
 

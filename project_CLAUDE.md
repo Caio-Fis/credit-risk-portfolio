@@ -21,10 +21,13 @@ sem histórico próprio de inadimplência. O score único de bureau é insuficie
 enriquecido com séries macroeconômicas do BCB (Selic, inadimplência setorial).
 Módulo 3 usa dataset sintético com DGP controlado.
 
-**Modelo PD:** LightGBM + calibração de Platt scaling.
+**Modelo PD:** LightGBM + calibração isotônica (isotonic regression).
 - Motivo: gradient boosting produz bom ranking mas probabilidades mal calibradas.
   Para EL em reais precisamos de probabilidade em escala real.
-- NÃO usar isotonic regression — overfita em amostras menores.
+- Platt scaling (sigmoid) comprime probabilidades para o centro — causa miscalibração
+  sistemática confirmada por Hosmer-Lemeshow (H=515, p≈0) e teste binomial Basel.
+- Isotonic regression corrige curvatura não-linear sem restrição de forma funcional.
+  Overfitting só é risco com amostras de calibração <1000 — aqui temos 246K.
 
 **Modelo LGD:** Regressão Beta (variável resposta em [0,1]).
 - Tratado como problema separado do PD — custo de erro é diferente.

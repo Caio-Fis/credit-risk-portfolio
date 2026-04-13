@@ -2,13 +2,17 @@
 
 Arquitetura:
 - LightGBM como ranqueador (bom AUROC/KS mas probabilidades mal calibradas)
-- CalibratedClassifierCV com method='sigmoid' (Platt scaling) para calibrar
-  as probabilidades em escala real — necessário para calcular EL em R$
+- CalibratedClassifierCV com method='isotonic' para calibrar as probabilidades
+  em escala real — necessário para calcular EL em R$
 
-NÃO usar isotonic regression: overfita em amostras menores.
+Platt scaling (sigmoid) foi descartado após testes de Hosmer-Lemeshow e
+binomial Basel mostrarem miscalibração sistemática na faixa 5–20% de PD:
+o modelo subprediz risco nessa faixa em ~20–35%. Isotonic regression
+não tem restrição de forma funcional e corrige a curvatura. Overfitting
+do isotônico só é risco com <1000 amostras — temos 246K de treino.
 
 Funções principais:
-- train_pd: treina LightGBM + Platt e loga no MLflow
+- train_pd: treina LightGBM + isotonic e loga no MLflow
 - predict_pd: retorna probabilidades calibradas
 - load_pd_model: carrega modelo do MLflow
 """
@@ -53,7 +57,7 @@ LGBM_PARAMS: dict[str, Any] = {
     "verbose": -1,
 }
 
-CALIBRATION_CV = 3  # 5 folds × cópia do dataset = pico de RAM; 3 é suficiente
+CALIBRATION_CV = 3  # folds para calibração; 3 é suficiente e poupa RAM
 TARGET_COL = "TARGET"
 TEST_SIZE = 0.2      # 20% hold-out para avaliação out-of-sample
 OOS_PATH = PROCESSED_DIR / "oos_predictions.parquet"
@@ -115,7 +119,7 @@ def train_pd(
     # Platt scaling: treina LGBM em (n-1) folds, calibra no fold restante
     calibrated_model = CalibratedClassifierCV(
         estimator=lgbm,
-        method="sigmoid",  # Platt scaling
+        method="isotonic",  # corrige curvatura não-linear; Platt causava miscalibração 5–20%
         cv=CALIBRATION_CV,
     )
 

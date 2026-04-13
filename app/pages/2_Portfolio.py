@@ -11,7 +11,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.config import PROCESSED_DIR
 from src.contextual.data_generator import generate_dataset
-from src.evaluate.metrics import auroc, brier_score, ks_stat
+from src.evaluate.metrics import (
+    auroc,
+    binomial_test_by_bucket,
+    brier_score,
+    gini,
+    hosmer_lemeshow_test,
+    ks_stat,
+)
 from src.models.expected_loss import el_by_segment
 
 st.set_page_config(page_title="Dashboard de Portfólio", layout="wide")
@@ -150,10 +157,11 @@ if OOS_PATH.exists():
     y_pred = oos["y_pred"].values
 
     auroc_val = auroc(y_true, y_pred)
+    gini_val = gini(y_true, y_pred)
     ks_val = ks_stat(y_true, y_pred)
     brier_val = brier_score(y_true, y_pred)
 
-    m1, m2, m3 = st.columns(3)
+    m1, m2, m3, m4 = st.columns(4)
     with m1:
         color = "normal" if auroc_val >= 0.78 else "inverse"
         st.metric(
@@ -163,6 +171,13 @@ if OOS_PATH.exists():
             delta_color=color,
         )
     with m2:
+        st.metric(
+            "Gini (OOS)",
+            f"{gini_val:.4f}",
+            delta="padrão indústria de crédito",
+            delta_color="off",
+        )
+    with m3:
         color = "normal" if ks_val >= 0.35 else "inverse"
         st.metric(
             "KS Stat (OOS)",
@@ -170,7 +185,7 @@ if OOS_PATH.exists():
             delta="≥ 0.35 ✓" if ks_val >= 0.35 else f"meta 0.35 — gap {0.35 - ks_val:.4f}",
             delta_color=color,
         )
-    with m3:
+    with m4:
         color = "normal" if brier_val <= 0.15 else "inverse"
         st.metric(
             "Brier Score (OOS)",
@@ -194,6 +209,81 @@ if OOS_PATH.exists():
         color_discrete_map={"Adimplente": "steelblue", "Default": "coral"},
     )
     st.plotly_chart(fig_dist, use_container_width=True)
+
+    # ---------------------------------------------------------------------------
+    # Testes estatísticos de calibração
+    # ---------------------------------------------------------------------------
+    st.divider()
+    st.subheader("Validação Estatística da Calibração")
+    st.caption(
+        "Valida se as PDs preditas correspondem às taxas de default observadas — "
+        "fundamento para confiar no EL = PD × LGD × EAD em reais."
+    )
+
+    tab_hl, tab_bucket = st.tabs(["Hosmer-Lemeshow", "Teste Binomial por Bucket (Basel)"])
+
+    with tab_hl:
+        hl_stat, hl_pvalue, hl_table = hosmer_lemeshow_test(y_true, y_pred)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("Estatística H-L", f"{hl_stat:.2f}")
+        with c2:
+            color = "normal" if hl_pvalue > 0.05 else "inverse"
+            st.metric(
+                "p-value",
+                f"{hl_pvalue:.4f}",
+                delta="calibração OK (p > 0.05)" if hl_pvalue > 0.05 else "miscalibração detectada",
+                delta_color=color,
+            )
+        st.caption(
+            "H0: modelo bem calibrado. Não rejeitar (p > 0.05) é o resultado desejável. "
+            "p-value alto significa que os defaults observados são compatíveis com as PDs preditas."
+        )
+        display_cols = ["faixa_pd", "contratos", "observed", "expected", "default_rate_obs", "pd_mean", "ratio_obs_exp"]
+        available_cols = [c for c in display_cols if c in hl_table.columns]
+        st.dataframe(
+            hl_table[available_cols].style.format({
+                "default_rate_obs": "{:.3f}",
+                "pd_mean": "{:.3f}",
+                "ratio_obs_exp": "{:.2f}",
+                "expected": "{:.1f}",
+            }),
+            use_container_width=True,
+        )
+
+    with tab_bucket:
+        bucket_result = binomial_test_by_bucket(y_true, y_pred)
+
+        n_verde = (bucket_result["semaforo"] == "Verde").sum()
+        n_amarelo = (bucket_result["semaforo"] == "Amarelo").sum()
+        n_vermelho = (bucket_result["semaforo"] == "Vermelho").sum()
+
+        b1, b2, b3 = st.columns(3)
+        with b1:
+            st.metric("Verde (p > 0.05)", n_verde)
+        with b2:
+            st.metric("Amarelo (0.01–0.05)", n_amarelo)
+        with b3:
+            st.metric("Vermelho (p ≤ 0.01)", n_vermelho)
+
+        st.caption(
+            "Teste binomial unilateral: para cada faixa de PD, verifica se o número "
+            "de defaults observados é compatível com a PD média predita. "
+            "Padrão Basel III (Resolução BCB 4.557)."
+        )
+        st.dataframe(
+            bucket_result.style.format({
+                "pd_media_predita": "{:.3f}",
+                "taxa_obs": "{:.3f}",
+                "p_value": "{:.4f}",
+            }).applymap(
+                lambda v: "background-color: #d4edda" if v == "Verde"
+                else ("background-color: #fff3cd" if v == "Amarelo"
+                else "background-color: #f8d7da"),
+                subset=["semaforo"],
+            ),
+            use_container_width=True,
+        )
 else:
     st.info(
         "Arquivo OOS não encontrado. Execute `make train` para gerar predições hold-out."

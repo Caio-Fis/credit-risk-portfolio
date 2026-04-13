@@ -94,7 +94,7 @@ def tune_pd_hyperparams(n_trials: int = N_TRIALS) -> dict:
 
     # Avalia com calibração no OOS — estimativa honesta
     best_lgbm = LGBMClassifier(**{**best, "random_state": SEED, "n_jobs": 2, "verbose": -1})
-    calibrated = CalibratedClassifierCV(best_lgbm, method="sigmoid", cv=3)
+    calibrated = CalibratedClassifierCV(best_lgbm, method="isotonic", cv=3)
     calibrated.fit(X_train, y_train)
     y_pred_oos = calibrated.predict_proba(X_test)[:, 1]
     auroc_oos = roc_auc_score(y_test, y_pred_oos)
