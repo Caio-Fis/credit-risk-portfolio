@@ -159,6 +159,9 @@ def hosmer_lemeshow_test(
     grouped["ratio_obs_exp"] = grouped["observed"] / grouped["expected"].clip(lower=1e-6)
 
     result = grouped.rename(columns={"bin": "faixa_pd", "n": "contratos"})
+    result["faixa_pd"] = result["faixa_pd"].apply(
+        lambda iv: f"({iv.left:.2%}, {iv.right:.2%}]"
+    )
 
     logger.info(
         f"Hosmer-Lemeshow: H={hl_stat:.2f}, df={df_freedom}, p={p_value:.4f} "
