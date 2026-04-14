@@ -1,5 +1,13 @@
 # Credit Risk Portfolio — End-to-end pipeline for SME credit risk
 
+[![CI](https://github.com/Caio-Fis/credit-risk-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/Caio-Fis/credit-risk-portfolio/actions/workflows/ci.yml)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://credit-risk-portfolio-gpnlnaabd9q3ddfubdugz6.streamlit.app)
+
+> **Live demo:** [credit-risk-portfolio-gpnlnaabd9q3ddfubdugz6.streamlit.app](https://credit-risk-portfolio-gpnlnaabd9q3ddfubdugz6.streamlit.app)
+
+---
+
 ## The problem
 
 Financial institutions that operate credit for micro and small businesses face a paradox: they must decide credit limit, tenor, and rate at origination, but the most relevant data about the borrower — payment behavior, seasonality, customer concentration — only surfaces months later.
