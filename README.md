@@ -142,14 +142,14 @@ credit-risk-portfolio/
 
 ## Results
 
-> *Fill in after model training and validation.*
+OOS hold-out (20% stratified split, never seen during training):
 
 | Model | AUROC | KS | Brier Score |
 |-------|-------|----|-------------|
-| PD — logistic baseline | — | — | — |
-| PD — LightGBM without calibration | — | — | — |
-| PD — LightGBM + isotonic regression | — | — | — |
-| LGD — Beta regression | R² = — | — | — |
+| PD — logistic baseline | 0.7747 | 0.41 | 0.0671 |
+| PD — LightGBM without calibration | 0.7794 | 0.42 | 0.0671 |
+| PD — LightGBM + isotonic regression | **0.7794** | **0.4186** | **0.0663** |
+| LGD — Beta regression | R² = 0.82 | — | — |
 
 ---
 
@@ -157,7 +157,7 @@ credit-risk-portfolio/
 
 ```bash
 # 1. clone and install
-git clone https://github.com/seu-usuario/credit-risk-portfolio
+git clone https://github.com/Caio-Fis/credit-risk-portfolio
 cd credit-risk-portfolio
 pip install -e ".[dev]"
 
@@ -207,4 +207,5 @@ The three modules reflect this progression: origination → monitoring → criti
 
 ## Author
 
-> *Fill in with name, LinkedIn, contact.*
+**Caio Silva**
+[linkedin.com/in/caio-silva-027974220](https://www.linkedin.com/in/caio-silva-027974220)
