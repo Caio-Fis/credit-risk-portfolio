@@ -14,9 +14,9 @@ PD(client, product, tenor) = sigmoid(
 )
 
 Product effects (β_product):
-- capital_de_giro:        0.0  (baseline)
-- investimento:          +1.2  (long tenor → structurally higher PD)
-- antecipacao_recebiveis: -0.8 (short tenor, embedded collateral → lower PD)
+- working_capital:        0.0  (baseline)
+- investment:            +1.2  (long tenor → structurally higher PD)
+- receivables_advance:   -0.8 (short tenor, embedded collateral → lower PD)
 
 Tenor effect: +0.4 × log(tenor_months)
 - 1 month:  log(1) = 0.00 → no additional effect
@@ -46,14 +46,14 @@ DGP_PARAMS = {
     "beta_interacao": -0.3,  # low score penalised more at long tenors
     "beta_garantia": -0.6,  # collateral → lower PD
     "product_effects": {
-        "capital_de_giro": 0.0,  # baseline
-        "investimento": 1.2,  # structural long-tenor risk
-        "antecipacao_recebiveis": -0.8,  # embedded collateral (receivables)
+        "working_capital": 0.0,  # baseline
+        "investment": 1.2,  # structural long-tenor risk
+        "receivables_advance": -0.8,  # embedded collateral (receivables)
     },
     "lgd_base": {
-        "capital_de_giro": 0.55,
-        "investimento": 0.65,  # no real collateral → higher LGD
-        "antecipacao_recebiveis": 0.30,  # receivables as collateral
+        "working_capital": 0.55,
+        "investment": 0.65,  # no real collateral → higher LGD
+        "receivables_advance": 0.30,  # receivables as collateral
     },
     "noise_std": 0.5,  # idiosyncratic variability
 }
@@ -71,7 +71,7 @@ def dgp_pd(
 
     Args:
         score_financeiro: Client's normalised score [0,1] (higher = better).
-        produto: Product type ('capital_de_giro', 'investimento', 'antecipacao_recebiveis').
+        produto: Product type ('working_capital', 'investment', 'receivables_advance').
         prazo_meses: Tenor in months.
         has_collateral: Binary array (1 = with real collateral).
         params: DGP parameters.
@@ -151,7 +151,7 @@ def generate_dataset(
             prazo = TENORS_MONTHS[ctx_idx // len(PRODUCTS)]
 
             ead = faturamento_anual[client_idx] * rng.uniform(0.05, 0.40)
-            has_collateral = rng.random() < (0.6 if produto == "investimento" else 0.2)
+            has_collateral = rng.random() < (0.6 if produto == "investment" else 0.2)
 
             pd_true = dgp_pd(
                 score_financeiro=np.array([score_financeiro[client_idx]]),

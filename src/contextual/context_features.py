@@ -15,9 +15,9 @@ from loguru import logger
 
 # Product-to-long-term-risk mapping
 PRODUCT_RISK_ORDER = {
-    "antecipacao_recebiveis": 0,
-    "capital_de_giro": 1,
-    "investimento": 2,
+    "receivables_advance": 0,
+    "working_capital": 1,
+    "investment": 2,
 }
 
 # Tenor categories

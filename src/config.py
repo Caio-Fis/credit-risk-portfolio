@@ -65,7 +65,7 @@ SCORE_MAX = 1000
 # ---------------------------------------------------------------------------
 # Valid products and tenors (Module 3)
 # ---------------------------------------------------------------------------
-PRODUCTS = ["capital_de_giro", "investimento", "antecipacao_recebiveis"]
+PRODUCTS = ["working_capital", "investment", "receivables_advance"]
 TENORS_MONTHS = [1, 3, 6, 12, 24, 36, 48]
 
 # ---------------------------------------------------------------------------
