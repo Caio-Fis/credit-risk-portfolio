@@ -131,7 +131,7 @@ def test_flag_score_drop_alert_level():
     alerts = flag_score_drop(trajectory, threshold=30)
     if not alerts.empty:
         assert "alert_level" in alerts.columns
-        assert set(alerts["alert_level"].unique()).issubset({"atenção", "crítico"})
+        assert set(alerts["alert_level"].unique()).issubset({"attention", "critical"})
 
 
 # ---------------------------------------------------------------------------

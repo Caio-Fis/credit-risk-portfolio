@@ -31,7 +31,7 @@ def test_compute_el_all_zero_pd():
 
 
 def test_compute_el_shape_mismatch():
-    with pytest.raises(ValueError, match="mesmo comprimento"):
+    with pytest.raises(ValueError, match="same length"):
         compute_el(np.array([0.1, 0.2]), np.array([0.5]), np.array([100_000, 200_000]))
 
 
@@ -41,7 +41,7 @@ def test_el_summary_returns_dataframe(synthetic_df):
     df["AMT_CREDIT"] = df["ead"]
     summary = el_summary(df)
     assert isinstance(summary, pd.DataFrame)
-    assert "total_el_R$" in summary.columns
+    assert "total_el" in summary.columns
     assert "el_rate_%" in summary.columns
 
 
