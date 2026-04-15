@@ -14,7 +14,7 @@ Financial institutions that operate credit for micro and small businesses face a
 
 The single-score model compounds the problem by collapsing all this complexity into a number between 0 and 1000 that ignores the operation's context. A score of 650 may be adequate for 30-day working capital and completely inadequate for a 48-month investment loan. Same CNPJ, radically different risks.
 
-This project demonstrates an alternative architecture: separate PD and LGD models, enrichment with macroeconomic data, contextual scoring by product and tenor, and continuous drift monitoring — all with per-contract explainability.
+This project demonstrates an alternative architecture: separate PD and LGD models, enrichment with macroeconomic data, contextual scoring by product and tenor, and continuous drift monitoring, all with per-contract explainability.
 
 ---
 
