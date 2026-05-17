@@ -51,6 +51,9 @@ docker-up:
 docker-down:
 	docker compose down
 
+sync-hf-space:
+	bash scripts/sync_hf_space.sh
+
 tune:
 	uv run python -m src.models.tune_pd
 
