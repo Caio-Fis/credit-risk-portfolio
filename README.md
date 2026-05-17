@@ -184,11 +184,113 @@ uv run python -m src.models.pd_model_lc          # train champion
 uv run python -m src.models.online_pd_model      # train challenger (~14 min)
 uv run python -m src.explain.run_adaptive_shap   # produce SHAP heatmap + surrogate
 
-# 3. start the app
+# 3. start the FastAPI service
+make api-dev                # http://localhost:7860/docs
+
+# 4. start the Streamlit lab
 make app
 ```
 
 The Makefile chains are idempotent — re-running skips work whose outputs already exist.
+
+---
+
+## v3 — Production API
+
+The same trained model is exposed as a FastAPI service (`src/api/`) that
+follows production patterns: Pydantic-typed schemas, lifespan-managed
+artefacts, structured JSON logs, Prometheus metrics, background tasks,
+and a multi-stage Dockerfile ready for HuggingFace Spaces.
+
+### Architecture
+
+```mermaid
+flowchart LR
+    User([User / Streamlit / curl])
+    subgraph FastAPI [FastAPI · src/api]
+        Pred[/v1/predict<br>predict/batch/]
+        Exp[/v1/explain]
+        Mon["/v1/monitor/*<br>(drift · drift/live · calibration)"]
+        Recal[POST /v1/monitor/recalibrate]
+        Metrics[/metrics &amp; /health]
+    end
+    subgraph State [In-process state]
+        Reg[ModelRegistry<br>LightGBM + isotonic +<br>TreeExplainer + FRED macro]
+        Live[LiveDriftMonitor<br>ADWIN + KSWIN + rolling PSI]
+    end
+    subgraph Artefacts [On disk]
+        Joblib[(pd_model_lc.joblib<br>pd_calibrator_lc.joblib)]
+        Parquet[(macro_features.parquet<br>arf_drifts_lc.csv<br>sliding_calibration_lc.csv)]
+    end
+    User --> Pred & Exp & Mon & Recal & Metrics
+    Pred --> Reg
+    Pred -. update .-> Live
+    Exp --> Reg
+    Mon --> Live & Parquet
+    Recal -. queues .-> Live
+    Reg --> Joblib & Parquet
+```
+
+### Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | Liveness |
+| GET | `/v1/models/info` | Model metadata + OOT metrics |
+| POST | `/v1/predict` | Calibrated PD for one loan |
+| POST | `/v1/predict/batch` | Up to 1000 loans |
+| POST | `/v1/explain` | SHAP contributions + top 5 drivers |
+| GET | `/v1/monitor/drift` | Historical ARF stream replay |
+| GET | `/v1/monitor/drift/live` | **Live** ADWIN + KSWIN + PSI from in-process state |
+| GET | `/v1/monitor/calibration` | Rolling Brier / slope / refit timestamp |
+| POST | `/v1/monitor/recalibrate` | Trigger background sliding-window refit (202) |
+| GET | `/metrics` | Prometheus exposition |
+| GET | `/docs`, `/redoc` | Auto-generated OpenAPI UI |
+
+### Local quick-start
+
+```bash
+# Dev (hot reload)
+make api-dev
+
+# Containerised
+make docker-up          # docker compose up -d --build
+curl http://localhost:7860/health
+curl http://localhost:7860/docs           # Swagger UI
+
+# Predict
+curl -X POST http://localhost:7860/v1/predict \
+  -H 'content-type: application/json' \
+  -d '{"revenue":65000,"dti_n":18.5,"loan_amnt":15000,"fico_n":720,
+       "experience_c":1,"emp_length":5,"purpose":"debt_consolidation",
+       "home_ownership_n":"MORTGAGE","addr_state":"CA","zip_code":"900xx",
+       "issue_d":"2017-06-01"}'
+
+# Explain
+curl -X POST http://localhost:7860/v1/explain \
+  -H 'content-type: application/json' -d @loan.json
+
+# Watch drift
+curl http://localhost:7860/v1/monitor/drift/live | jq .
+```
+
+### Deployment
+
+Free, sleep-free hosting via [HuggingFace Spaces (Docker SDK)](https://huggingface.co/docs/hub/spaces-sdks-docker).
+The auto-deploy workflow at `.github/workflows/ci.yml` pushes the repo to
+the Space on every merge to `master` (gated by `HF_TOKEN`, `HF_USER`,
+`HF_SPACE` secrets). Full guide: [docs/deploy.md](docs/deploy.md).
+
+### Observability
+
+- **Logs**: every request emits one JSON line with `request_id`, `route`,
+  `status`, `latency_ms`. The middleware also captures unhandled
+  exceptions with stack trace.
+- **Metrics**: `/metrics` exposes Prometheus counters, gauges, and
+  histograms — HTTP latency, prediction count, prediction-PD
+  distribution, drift events by detector, recalibration counter.
+- **Drift live state**: every prediction feeds ADWIN, KSWIN, and rolling
+  PSI in-process; `/v1/monitor/drift/live` returns the current snapshot.
 
 ---
 

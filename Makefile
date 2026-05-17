@@ -31,6 +31,26 @@ features-lc:
 
 pipeline-lc: data-lc features-lc
 
+# ---- v3 API (FastAPI service) ----
+api-dev:
+	uv run uvicorn src.api.main:app --reload --port 7860
+
+api-prod:
+	CREDIT_RISK_ENVIRONMENT=production uv run uvicorn src.api.main:app --host 0.0.0.0 --port 7860 --proxy-headers
+
+docker-build:
+	docker build -t credit-risk-api:dev .
+
+docker-run:
+	docker run --rm -p 7860:7860 credit-risk-api:dev
+
+docker-up:
+	docker compose up -d --build
+	@echo "API available at http://localhost:7860  /docs"
+
+docker-down:
+	docker compose down
+
 tune:
 	uv run python -m src.models.tune_pd
 

@@ -110,6 +110,56 @@
 - 3 artifacts gerados: `adaptive_shap_heatmap.png` (top 12 features × 48 meses), `shap_by_decile_lc.png` (10 deciles × top 12 features em 2017), `ridge_surrogate_coefs.png` (top 10 coefs ao longo do tempo).
 - **Confirmação interessante via Ridge surrogate**: macro features (fed_funds_rate, us_unemployment, us_real_gdp_yoy, us_10y_treasury) aparecem no top 10 — LightGBM ESTÁ usando macro, só não está sendo muito eficiente nisso (alinha com AUROC modesto do dataset).
 
-### Fase 6 — Streamlit (pendente)
-### Fase 7 — Docs/tests/CI (parcial — README ainda não atualizado)
+### Fase 6+7 — Pivô para production backend (decidido 2026-05-17)
+
+**Decisão:** trocar "2 páginas Streamlit a mais" por **FastAPI + HF Spaces + Docker + CI**. Streamlit atual mantido como lab. Alvo: posicionamento ML Engineer sênior. Budget: ~1 semana.
+
+#### Block A — Backend core (~3-5h)
+- [ ] A.1 Scaffolding `src/api/`: `app.py`, `routers/`, `schemas/`, `dependencies.py`
+- [ ] A.2 Pydantic schemas (PredictionRequest, PredictionResponse, ExplanationResponse, DriftStatus, etc.) alinhados com `data/schemas/lendingclub.json`
+- [ ] A.3 `/v1/predict` (single) + `/v1/predict/batch` — recebe features, retorna PD calibrada
+- [ ] A.4 `/health` + `/version` (model SHA, training date, OOT AUROC)
+- [ ] A.5 Model lifecycle: carregar `pd_model_lc.joblib` + calibrator no startup, hot-reload via SIGUSR1
+
+#### Block B — Observability (~2-3h)
+- [ ] B.1 `loguru` com formato JSON estruturado (request_id, latency_ms, route, status)
+- [ ] B.2 Prometheus metrics endpoint `/metrics` (request counter, latency histogram, prediction distribution)
+- [ ] B.3 Middleware: gerar request_id, medir latency, logar
+- [ ] B.4 Custom metrics: drift_events_total, recalibration_total, brier_window, calibration_slope
+
+#### Block C — ML endpoints (~3-5h)
+- [ ] C.1 `/v1/explain` — SHAP waterfall per-request (TreeSHAP on-the-fly)
+- [ ] C.2 `/v1/monitor/drift` — estado atual ADWIN + KSWIN + PSI top features
+- [ ] C.3 `/v1/monitor/calibration` — Brier rolling, slope, last refit timestamp
+- [ ] C.4 `POST /v1/recalibrate` — trigger background task de sliding-window refit
+- [ ] C.5 `/v1/models/info` — metadados, versão, métricas OOT, references aos papers
+
+#### Block D — Background tasks + state (~2-3h)
+- [ ] D.1 Drift monitoring loop (asyncio task): a cada predição, alimenta ADWIN+KSWIN, persiste estado
+- [ ] D.2 Recalibration scheduler: cron interno semanal + trigger manual via endpoint
+- [ ] D.3 In-memory state com persistência periódica em parquet (sem Redis)
+
+#### Block E — Containerização + deploy (~2-3h)
+- [ ] E.1 `Dockerfile` (multi-stage, uv pip compile, slim Python 3.11)
+- [ ] E.2 `docker-compose.yml` para local dev (uvicorn + opcional Prometheus)
+- [ ] E.3 HF Spaces config (`Spacefile` ou Dockerfile-based), variável `MODEL_PATH`
+- [ ] E.4 README de deploy + comando único `make deploy`
+
+#### Block F — Frontend integration (~3-5h)
+- [ ] F.1 Nova página Streamlit `app/pages/6_APIPlayground.py` que consome a API live
+- [ ] F.2 Atualizar `4_Explainability.py` para chamar `/v1/explain` em vez de SHAP local
+- [ ] F.3 Atualizar `Home.py` com nova arquitetura (Streamlit + API) e link pro `/docs`
+
+#### Block G — Tests + CI (~3-4h)
+- [ ] G.1 Tests novos: `test_api.py` (httpx async client, mock model)
+- [ ] G.2 Tests de schema validation (Pydantic + invalid inputs)
+- [ ] G.3 Coverage > 70% no novo módulo `src/api/`
+- [ ] G.4 CI: lint + test + docker build + push to GHCR + auto-deploy hook to HF Spaces on main
+
+#### Block H — Docs (~1-2h)
+- [ ] H.1 Seção API no README com curl examples e link pro `/docs`
+- [ ] H.2 Architecture diagram (Mermaid ou PNG): browser → Vercel/Streamlit → FastAPI → model
+- [ ] H.3 Atualizar Author / About com a nova capability claim
+
+**Estimativa total: ~22-32h.** Cabe na semana com folga pra debug e refactor.
 

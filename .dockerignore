@@ -1,0 +1,70 @@
+# --- VCS & local-only ----------------------------------------------------
+.git
+.gitignore
+.gitattributes
+.github
+
+# --- Python build artefacts ---------------------------------------------
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+build
+dist
+
+# --- Virtual envs --------------------------------------------------------
+.venv
+venv
+.python-version
+
+# --- Heavy data, not needed by API --------------------------------------
+data/raw
+data/processed/feature_store.parquet
+data/processed/lendingclub_raw.parquet
+data/processed/lendingclub_features.parquet
+data/processed/frozen_lgbm_predictions_lc.parquet
+data/processed/oos_predictions_lc.parquet
+data/processed/oos_predictions.parquet
+data/processed/arf_predictions_lc.parquet
+data/processed/ridge_surrogate_coefs.csv
+data/processed/adaptive_shap_*.csv
+data/processed/rolling_oot_lc.csv
+data/processed/frozen_oot_lc.csv
+data/processed/arf_yearly_lc.csv
+mlruns
+mlartifacts
+
+# --- Notebooks (use API, not Jupyter, in production) --------------------
+notebooks
+*.ipynb
+.ipynb_checkpoints
+
+# --- Local UX & telemetry -----------------------------------------------
+.claude
+.vscode
+.idea
+tasks
+logs
+.streamlit
+
+# --- Plot artefacts (not used by API) -----------------------------------
+artifacts/*.png
+
+# --- README / docs (kept on GitHub, irrelevant inside container) --------
+README.md
+docs
+
+# --- Streamlit app (separate frontend) ----------------------------------
+app
+
+# --- Tests (out of runtime image) ---------------------------------------
+tests
+
+# --- Config that should not leak ---------------------------------------
+.env
+.env.*
+kaggle.json
