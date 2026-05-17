@@ -49,6 +49,15 @@ htmlcov/
 # Feature store (45MB — gerada por make features, não vai para o repo)
 data/processed/feature_store.parquet
 
+# v2 derived parquets — regenerable via `make pipeline-lc`
+data/processed/lendingclub_*.parquet
+data/processed/frozen_*.parquet
+data/processed/oos_predictions_lc.parquet
+data/processed/arf_predictions_lc.parquet
+
+# Claude Code local settings / state
+.claude/
+
 # Logs
 logs/
 

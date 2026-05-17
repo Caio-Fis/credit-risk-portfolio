@@ -508,6 +508,288 @@ def oos_comparison_plot(
     return fig
 
 
+def rolling_oot_evaluation(
+    df: pd.DataFrame,
+    train_params: dict | None = None,
+    categorical_cols: list[str] | None = None,
+    feature_cols: list[str] | None = None,
+    date_col: str = "issue_d",
+    target_col: str = "target",
+    freq: str = "Y",
+    start_year: int = 2009,
+    end_year: int = 2017,
+    use_calibration: bool = True,
+) -> pd.DataFrame:
+    """Rolling out-of-time evaluation: retrain on [start..t-1], evaluate on t.
+
+    For each period t (yearly by default), trains a LightGBM on all data
+    issued strictly before t and evaluates on data issued during t. This is
+    the honest measure of how a static model degrades over real time.
+
+    Returns a DataFrame with one row per period, including AUROC, KS, Brier,
+    calibration slope, and base rate.
+    """
+    from lightgbm import LGBMClassifier, early_stopping, log_evaluation
+    from sklearn.isotonic import IsotonicRegression
+    from sklearn.linear_model import LinearRegression
+
+    if train_params is None:
+        train_params = {
+            "n_estimators": 800,
+            "learning_rate": 0.05,
+            "num_leaves": 63,
+            "min_child_samples": 200,
+            "subsample": 0.85,
+            "subsample_freq": 1,
+            "colsample_bytree": 0.85,
+            "reg_alpha": 0.5,
+            "reg_lambda": 1.0,
+            "objective": "binary",
+            "metric": "auc",
+            "random_state": 42,
+            "n_jobs": -1,
+            "verbose": -1,
+        }
+
+    df = df.copy()
+    df[date_col] = pd.to_datetime(df[date_col])
+
+    if feature_cols is None:
+        feature_cols = [c for c in df.columns if c not in {target_col, date_col}]
+    if categorical_cols:
+        for c in categorical_cols:
+            if c in df.columns:
+                df[c] = df[c].astype("category")
+
+    rows = []
+    for year in range(start_year, end_year + 1):
+        train_mask = df[date_col].dt.year < year
+        test_mask = df[date_col].dt.year == year
+        if train_mask.sum() < 5000 or test_mask.sum() < 500:
+            logger.warning(f"  Year {year}: skipped (train={train_mask.sum()}, test={test_mask.sum()})")
+            continue
+
+        # Take last 6 months of train as inner-val for calibration + early stop
+        train = df[train_mask]
+        cutoff = train[date_col].max() - pd.DateOffset(months=6)
+        inner_train = train[train[date_col] <= cutoff]
+        inner_val = train[train[date_col] > cutoff]
+        if len(inner_val) < 500:
+            inner_train, inner_val = train, train.sample(frac=0.1, random_state=42)
+
+        X_tr, y_tr = inner_train[feature_cols], inner_train[target_col].astype("int8")
+        X_va, y_va = inner_val[feature_cols], inner_val[target_col].astype("int8")
+        X_te, y_te = df[test_mask][feature_cols], df[test_mask][target_col].astype("int8")
+
+        model = LGBMClassifier(**train_params)
+        model.fit(
+            X_tr, y_tr,
+            eval_set=[(X_va, y_va)],
+            eval_metric="auc",
+            callbacks=[early_stopping(40), log_evaluation(period=0)],
+            categorical_feature=categorical_cols or "auto",
+        )
+        p_va_raw = model.predict_proba(X_va)[:, 1]
+        p_te_raw = model.predict_proba(X_te)[:, 1]
+
+        if use_calibration:
+            cal = IsotonicRegression(out_of_bounds="clip").fit(p_va_raw, y_va.values)
+            p_te = cal.transform(p_te_raw)
+        else:
+            p_te = p_te_raw
+
+        # Calibration slope: regress y on logit(p)
+        eps = 1e-6
+        logit = np.log(np.clip(p_te, eps, 1 - eps) / (1 - np.clip(p_te, eps, 1 - eps)))
+        slope = float(LinearRegression().fit(logit.reshape(-1, 1), y_te.values).coef_[0])
+
+        rows.append({
+            "year": year,
+            "n_train": int(len(y_tr)),
+            "n_test": int(len(y_te)),
+            "base_rate_train": float(y_tr.mean()),
+            "base_rate_test": float(y_te.mean()),
+            "auroc": float(roc_auc_score(y_te, p_te)),
+            "ks": float(_ks_from_arrays(y_te.values, p_te)),
+            "brier": float(brier_score_loss(y_te, p_te)),
+            "calib_slope": slope,
+            "best_iteration": int(model.best_iteration_),
+        })
+        logger.info(
+            f"  Year {year}: AUROC={rows[-1]['auroc']:.4f}, KS={rows[-1]['ks']:.4f}, "
+            f"Brier={rows[-1]['brier']:.4f}, slope={rows[-1]['calib_slope']:.3f}"
+        )
+
+    return pd.DataFrame(rows)
+
+
+def frozen_oot_evaluation(
+    df: pd.DataFrame,
+    train_until_year: int,
+    test_start_year: int,
+    test_end_year: int,
+    train_params: dict | None = None,
+    categorical_cols: list[str] | None = None,
+    feature_cols: list[str] | None = None,
+    date_col: str = "issue_d",
+    target_col: str = "target",
+) -> pd.DataFrame:
+    """Train once on data ≤ `train_until_year`, then evaluate on each
+    subsequent year (frozen model). This is the canonical test of how a
+    static model degrades when never retrained — the motivation for the
+    online challenger.
+    """
+    from lightgbm import LGBMClassifier, early_stopping, log_evaluation
+    from sklearn.isotonic import IsotonicRegression
+    from sklearn.linear_model import LinearRegression
+
+    if train_params is None:
+        train_params = {
+            "n_estimators": 1500,
+            "learning_rate": 0.04,
+            "num_leaves": 63,
+            "min_child_samples": 200,
+            "subsample": 0.85,
+            "subsample_freq": 1,
+            "colsample_bytree": 0.85,
+            "reg_alpha": 0.5,
+            "reg_lambda": 1.0,
+            "objective": "binary",
+            "metric": "auc",
+            "random_state": 42,
+            "n_jobs": -1,
+            "verbose": -1,
+        }
+
+    df = df.copy()
+    df[date_col] = pd.to_datetime(df[date_col])
+    if feature_cols is None:
+        feature_cols = [c for c in df.columns if c not in {target_col, date_col}]
+    if categorical_cols:
+        for c in categorical_cols:
+            if c in df.columns:
+                df[c] = df[c].astype("category")
+
+    train_full = df[df[date_col].dt.year <= train_until_year]
+    cutoff = train_full[date_col].max() - pd.DateOffset(months=6)
+    inner_train = train_full[train_full[date_col] <= cutoff]
+    inner_val = train_full[train_full[date_col] > cutoff]
+    if len(inner_val) < 500:
+        inner_train, inner_val = train_full, train_full.sample(frac=0.1, random_state=42)
+
+    logger.info(
+        f"FROZEN training — ≤ {train_until_year}: {len(inner_train):,} train + {len(inner_val):,} inner-val"
+    )
+    model = LGBMClassifier(**train_params)
+    model.fit(
+        inner_train[feature_cols], inner_train[target_col].astype("int8"),
+        eval_set=[(inner_val[feature_cols], inner_val[target_col].astype("int8"))],
+        eval_metric="auc",
+        callbacks=[early_stopping(50), log_evaluation(period=0)],
+        categorical_feature=categorical_cols or "auto",
+    )
+    p_inner_val = model.predict_proba(inner_val[feature_cols])[:, 1]
+    calibrator = IsotonicRegression(out_of_bounds="clip").fit(
+        p_inner_val, inner_val[target_col].astype("int8").values
+    )
+
+    eps = 1e-6
+    rows = []
+    for year in range(test_start_year, test_end_year + 1):
+        test = df[df[date_col].dt.year == year]
+        if len(test) < 500:
+            continue
+        y_te = test[target_col].astype("int8").values
+        p_raw = model.predict_proba(test[feature_cols])[:, 1]
+        p = calibrator.transform(p_raw)
+        logit = np.log(np.clip(p, eps, 1 - eps) / (1 - np.clip(p, eps, 1 - eps)))
+        slope = float(LinearRegression().fit(logit.reshape(-1, 1), y_te).coef_[0])
+        rows.append({
+            "year": year,
+            "n_test": int(len(y_te)),
+            "base_rate_test": float(y_te.mean()),
+            "auroc": float(roc_auc_score(y_te, p)),
+            "ks": float(_ks_from_arrays(y_te, p)),
+            "brier": float(brier_score_loss(y_te, p)),
+            "calib_slope": slope,
+        })
+        logger.info(
+            f"  Year {year}: AUROC={rows[-1]['auroc']:.4f}, KS={rows[-1]['ks']:.4f}, "
+            f"Brier={rows[-1]['brier']:.4f}, slope={rows[-1]['calib_slope']:.3f}"
+        )
+    return pd.DataFrame(rows)
+
+
+def rolling_vs_frozen_plot(
+    rolling: pd.DataFrame,
+    frozen: pd.DataFrame,
+    train_until_year: int,
+    save_path: Path | None = None,
+) -> plt.Figure:
+    """Side-by-side plot: yearly-retrained vs frozen model."""
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharex=True)
+    for ax, col, label, lo_hi in zip(
+        axes,
+        ["auroc", "ks", "brier"],
+        ["AUROC", "KS", "Brier score"],
+        [(0.50, 0.80), (0.0, 0.4), (0.10, 0.25)],
+    ):
+        ax.plot(rolling["year"], rolling[col], "o-", color="steelblue", lw=2,
+                label="Retrained yearly")
+        ax.plot(frozen["year"], frozen[col], "s--", color="firebrick", lw=2,
+                label=f"Frozen at {train_until_year}")
+        ax.axvline(train_until_year + 0.5, color="black", alpha=0.3, lw=1, ls=":")
+        ax.set_title(label)
+        ax.set_xlabel("Year (held-out)")
+        ax.set_ylim(*lo_hi)
+        ax.grid(alpha=0.3)
+        if ax is axes[0]:
+            ax.legend(loc="lower right", fontsize=8)
+    fig.suptitle("Static PD model — retrained yearly vs frozen — LendingClub 2010-2017")
+    plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        logger.info(f"Rolling vs frozen plot saved at {save_path}")
+    return fig
+
+
+def _ks_from_arrays(y_true: np.ndarray, y_proba: np.ndarray) -> float:
+    df = pd.DataFrame({"y": y_true, "p": y_proba}).sort_values("p")
+    n_pos = int(y_true.sum()) or 1
+    n_neg = int(len(y_true) - y_true.sum()) or 1
+    cumpos = (df["y"] == 1).cumsum() / n_pos
+    cumneg = (df["y"] == 0).cumsum() / n_neg
+    return float((cumpos - cumneg).abs().max())
+
+
+def rolling_oot_plot(results: pd.DataFrame, save_path: Path | None = None) -> plt.Figure:
+    """Plots AUROC, KS, Brier over the rolling OOT years."""
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharex=True)
+    for ax, col, label, lo_hi in zip(
+        axes,
+        ["auroc", "ks", "brier"],
+        ["AUROC", "KS", "Brier score"],
+        [(0.5, 0.85), (0.0, 0.5), (0.10, 0.25)],
+    ):
+        ax.plot(results["year"], results[col], "o-", color="steelblue", lw=2)
+        ax.set_title(label)
+        ax.set_xlabel("Year (held-out)")
+        ax.set_ylim(*lo_hi)
+        ax.grid(alpha=0.3)
+        # Highlight 2008–2010 stress
+        ax.axvspan(2008, 2010, color="firebrick", alpha=0.08, label="2008 crisis")
+        if ax is axes[0]:
+            ax.legend(loc="lower right", fontsize=8)
+    fig.suptitle("Rolling Out-of-Time evaluation — static PD model retrained each year")
+    plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        logger.info(f"Rolling OOT plot saved at {save_path}")
+    return fig
+
+
 if __name__ == "__main__":
     from src.features.build_features import load_feature_store
     from src.models.pd_model import OOS_PATH, load_pd_model, predict_pd

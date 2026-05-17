@@ -1,8 +1,10 @@
-.PHONY: data features train tune evaluate pipeline app test lint install
+.PHONY: data features train tune evaluate pipeline app test lint install \
+        data-lc features-lc pipeline-lc
 
 install:
 	uv sync --all-extras
 
+# ---- Legacy pipeline (Home Credit, kept as secondary static baseline) ----
 data:
 	uv run python -m src.ingestion.download
 
@@ -18,6 +20,16 @@ evaluate:
 	uv run python -m src.evaluate.metrics
 
 pipeline: data features train evaluate
+
+# ---- v2 pipeline (LendingClub 2007-2018 + FRED macro + online learning) ----
+data-lc:
+	uv run python -m src.ingestion.download_lendingclub
+
+features-lc:
+	uv run python -m src.features.macro_features
+	uv run python -m src.features.lendingclub_features
+
+pipeline-lc: data-lc features-lc
 
 tune:
 	uv run python -m src.models.tune_pd

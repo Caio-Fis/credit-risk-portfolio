@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LendingClub Loan-Granting Dataset (Zenodo 11295916, CC-BY 4.0)",
+  "description": "Curated 2007-2018 LendingClub slice with origination-time features only and a pre-derived binary default target. 1,347,681 rows. Source: https://zenodo.org/records/11295916",
+  "type": "object",
+  "version": "1.0",
+  "source": {
+    "url": "https://zenodo.org/records/11295916/files/LC_loans_granting_model_dataset.csv?download=1",
+    "md5": "b019384d6bc65bf2a3e839362e4ff502",
+    "license": "CC-BY-4.0"
+  },
+  "raw_columns": {
+    "id": {"dtype": "int64", "nullable": false, "description": "Loan unique identifier — dropped as feature."},
+    "issue_d": {"dtype": "string", "format": "MMM-YYYY", "nullable": false, "description": "Loan issue month — canonical temporal axis."},
+    "revenue": {"dtype": "float64", "nullable": false, "description": "Self-reported annual income at application."},
+    "dti_n": {"dtype": "float64", "nullable": false, "description": "Debt-to-income ratio. Sentinel value 999 used for missing/unmeasured."},
+    "loan_amnt": {"dtype": "int64", "nullable": false, "description": "Requested loan amount in USD."},
+    "fico_n": {"dtype": "float64", "nullable": false, "description": "FICO score at application (midpoint of low/high range)."},
+    "experience_c": {"dtype": "int64", "nullable": false, "description": "Highly imbalanced (~99.998% =1, 25 zeros)."},
+    "emp_length": {"dtype": "string", "nullable": true, "description": "Employment length bucket ('< 1 year' .. '10+ years', 'NI' = not indicated)."},
+    "purpose": {"dtype": "string", "nullable": false, "enum": ["debt_consolidation","credit_card","home_improvement","other","major_purchase","medical","small_business","car"]},
+    "home_ownership_n": {"dtype": "string", "nullable": false, "enum": ["MORTGAGE","RENT","OWN","OTHER"]},
+    "addr_state": {"dtype": "string", "nullable": false, "description": "US two-letter state code."},
+    "zip_code": {"dtype": "string", "nullable": false, "description": "First three digits of ZIP, e.g. '350xx'."},
+    "Default": {"dtype": "int64", "nullable": false, "enum": [0, 1], "description": "Binary target — renamed to 'target' downstream."},
+    "title": {"dtype": "string", "nullable": true, "description": "Free-text borrower-provided loan title — dropped."},
+    "desc": {"dtype": "string", "nullable": true, "description": "Free-text borrower description — dropped (~91% NaN)."}
+  },
+  "target": {
+    "name": "target",
+    "type": "binary",
+    "positive_class": 1,
+    "positive_label": "default",
+    "base_rate": 0.1998,
+    "derived_from": "Default column (already binarized by curator from loan_status)."
+  },
+  "temporal": {
+    "axis_column": "issue_d",
+    "granularity": "monthly",
+    "range": ["2007-06-01", "2018-12-01"],
+    "n_unique_periods": 139
+  },
+  "feature_pipeline_output": {
+    "drops": ["id", "title", "desc", "experience_c"],
+    "renames": {"Default": "target"},
+    "adds": ["fed_funds_rate", "us_unemployment", "vix_close", "us_10y_treasury", "us_real_gdp_yoy"]
+  }
+}
