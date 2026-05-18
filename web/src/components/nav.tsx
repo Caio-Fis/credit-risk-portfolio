@@ -28,9 +28,9 @@ export function Nav() {
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
           </span>
           <span>
-            Análise de{" "}
+            {t.brand.pre}{" "}
             <span className="bg-gradient-to-r from-violet-400 to-emerald-400 bg-clip-text text-transparent">
-              Crédito
+              {t.brand.accent}
             </span>
           </span>
         </Link>

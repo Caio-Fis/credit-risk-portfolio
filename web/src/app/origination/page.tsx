@@ -2,13 +2,14 @@
 
 import Link from "next/link"
 import { useMutation } from "@tanstack/react-query"
-import { ChevronRightIcon, ShieldCheckIcon } from "lucide-react"
+import { ArrowRightIcon, MicroscopeIcon, ShieldCheckIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { LoanWizard } from "@/components/loan-wizard"
 import { RiskDetails } from "@/components/risk-details"
 import { RiskGauge } from "@/components/risk-gauge"
 import { RiskNarrative } from "@/components/risk-narrative"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -90,17 +91,46 @@ export default function OriginationPage() {
               </CardContent>
             </Card>
 
-            <Link
-              href="/explain"
-              className="group inline-flex items-center justify-center gap-1 self-center pt-2 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
-            >
-              {t.origination.advancedLink}
-              <ChevronRightIcon className="size-3 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            <AdvancedCTA />
           </>
         )}
       </div>
     </div>
+  )
+}
+
+function AdvancedCTA() {
+  const t = useT()
+  return (
+    <Card className="relative overflow-hidden ring-1 ring-violet-700/30">
+      {/* Subtle gradient glow on the top edge */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -inset-x-16 -top-24 h-32 bg-gradient-to-b from-violet-500/25 to-transparent blur-3xl"
+      />
+      <CardContent className="relative flex flex-col gap-4 pt-5 pb-5 sm:flex-row sm:items-center sm:gap-5">
+        <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-700/40">
+          <MicroscopeIcon className="size-5" />
+        </span>
+        <div className="flex-1 space-y-1">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-violet-300/80">
+            {t.origination.advancedCard.eyebrow}
+          </p>
+          <p className="text-base font-semibold tracking-tight text-zinc-100">
+            {t.origination.advancedCard.title}
+          </p>
+          <p className="text-sm leading-relaxed text-zinc-400">
+            {t.origination.advancedCard.body}
+          </p>
+        </div>
+        <Button asChild className="self-start sm:self-center">
+          <Link href="/explain">
+            {t.origination.advancedCard.cta}
+            <ArrowRightIcon className="size-3.5" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   )
 }
 

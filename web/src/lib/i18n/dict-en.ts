@@ -3,7 +3,8 @@ import type { Dict } from "./dict-pt"
 export const enDict: Dict = {
   brand: {
     full: "Credit Analysis",
-    short: "Credit",
+    pre: "Credit",
+    accent: "Analysis",
     tagline: "Smarter credit decisions in seconds.",
   },
 
@@ -107,6 +108,12 @@ export const enDict: Dict = {
       body: "The system goes to sleep when idle. The first analysis can take up to 20 seconds — try again in a moment.",
     },
     advancedLink: "See detailed analysis",
+    advancedCard: {
+      eyebrow: "Advanced view",
+      title: "Want more than the number?",
+      body: "See exactly how much each input weighed in the decision, the economic context, and the raw scores — ready for audit.",
+      cta: "Open detailed analysis",
+    },
   },
 
   wizard: {

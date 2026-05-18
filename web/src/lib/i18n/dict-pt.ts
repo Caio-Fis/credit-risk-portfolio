@@ -3,7 +3,8 @@
 export const ptDict = {
   brand: {
     full: "Análise de Crédito",
-    short: "Crédito",
+    pre: "Análise de",
+    accent: "Crédito",
     tagline: "Decisões de crédito mais inteligentes em segundos.",
   },
 
@@ -107,6 +108,12 @@ export const ptDict = {
       body: "O sistema fica em standby quando ocioso. A primeira análise pode demorar até 20 segundos — tente novamente em instantes.",
     },
     advancedLink: "Ver análise detalhada",
+    advancedCard: {
+      eyebrow: "Modo avançado",
+      title: "Quer ir além do número?",
+      body: "Veja a contribuição exata de cada dado para a decisão, o contexto econômico considerado e a pontuação bruta — pronto para auditoria.",
+      cta: "Abrir análise detalhada",
+    },
   },
 
   wizard: {
