@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from loguru import logger
 
 from src.api.dependencies import build_registry
@@ -87,6 +88,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
+
+    @app.get("/", include_in_schema=False)
+    async def root() -> RedirectResponse:
+        """Redirect bare-URL visits to the Swagger UI."""
+        return RedirectResponse(url="/docs", status_code=307)
 
     app.include_router(health.router)
     app.include_router(predict.router)
