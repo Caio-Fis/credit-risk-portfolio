@@ -6,7 +6,7 @@ colorTo: gray
 sdk: docker
 app_port: 7860
 pinned: false
-license: cc-by-4.0
+license: mit
 short_description: Adaptive PD scoring with drift-aware explainability
 ---
 
