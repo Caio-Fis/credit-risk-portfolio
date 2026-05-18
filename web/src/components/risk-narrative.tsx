@@ -7,7 +7,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { buildNarrative, headlineFromPd, type ContributionLite } from "@/lib/narrative"
+import { useT } from "@/lib/i18n/provider"
+import {
+  buildNarrative,
+  headlineFromPd,
+  type ContributionLite,
+} from "@/lib/narrative"
 
 type Props = {
   pd: number
@@ -17,8 +22,9 @@ type Props = {
 }
 
 export function RiskNarrative({ pd, riskBand, contributions, topN = 5 }: Props) {
-  const bullets = buildNarrative(contributions, topN)
-  const headline = headlineFromPd(pd, riskBand)
+  const t = useT()
+  const bullets = buildNarrative(t, contributions, topN)
+  const headline = headlineFromPd(t, pd, riskBand)
 
   return (
     <div className="space-y-4">
@@ -26,7 +32,7 @@ export function RiskNarrative({ pd, riskBand, contributions, topN = 5 }: Props) 
 
       <div>
         <p className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-500">
-          What drove this score
+          {t.result.narrative.whatDrove}
         </p>
         <ul className="space-y-2.5">
           {bullets.map((b) => {
@@ -51,16 +57,14 @@ export function RiskNarrative({ pd, riskBand, contributions, topN = 5 }: Props) 
                   )}
                 </span>
                 <span className="leading-snug">
-                  <span className="font-medium text-zinc-100">
-                    {b.label}
-                  </span>
+                  <span className="font-medium text-zinc-100">{b.label}</span>
                   <span className="text-zinc-500"> · {b.formattedValue} </span>
                   {b.tooltip && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          aria-label={`Explain ${b.label}`}
+                          aria-label={b.label}
                           className="inline-flex translate-y-px text-zinc-600 transition-colors hover:text-zinc-400"
                         >
                           <InfoIcon className="size-3" />
@@ -77,8 +81,9 @@ export function RiskNarrative({ pd, riskBand, contributions, topN = 5 }: Props) 
                         : "text-xs text-emerald-300/90"
                     }
                   >
-                    {isUp ? "Pushed risk up" : "Pulled risk down"} by ~
-                    {b.riskPoints} point{b.riskPoints === 1 ? "" : "s"}
+                    {isUp
+                      ? t.result.narrative.increased
+                      : t.result.narrative.reduced}
                   </span>
                 </span>
               </li>
@@ -88,10 +93,7 @@ export function RiskNarrative({ pd, riskBand, contributions, topN = 5 }: Props) 
       </div>
 
       <p className="text-[11px] leading-relaxed text-zinc-600">
-        &ldquo;Risk points&rdquo; are a relative scale based on each
-        feature&rsquo;s contribution in log-odds space, so you can compare
-        drivers within this loan but not directly read them off as percent
-        points of PD.
+        {t.result.narrative.footnote}
       </p>
     </div>
   )

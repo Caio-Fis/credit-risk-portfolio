@@ -27,6 +27,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { getFeatureSpec } from "@/lib/feature-labels"
+import { useT } from "@/lib/i18n/provider"
+import type { Dict } from "@/lib/i18n/dict-pt"
 import {
   HOME_OWNERSHIPS,
   PURPOSES,
@@ -39,17 +41,13 @@ import {
 type FieldName = keyof LoanFormValues
 
 type Step = {
-  id: string
-  title: string
-  subtitle: string
+  id: "borrower" | "loan" | "credit"
   fields: FieldName[]
 }
 
 const STEPS: Step[] = [
   {
     id: "borrower",
-    title: "About the borrower",
-    subtitle: "Income, employment and where they live.",
     fields: [
       "revenue",
       "emp_length",
@@ -61,14 +59,10 @@ const STEPS: Step[] = [
   },
   {
     id: "loan",
-    title: "The loan",
-    subtitle: "What they want, and when.",
     fields: ["loan_amnt", "purpose", "issue_d"],
   },
   {
     id: "credit",
-    title: "Credit profile",
-    subtitle: "Bureau-derived signals — the strongest predictors.",
     fields: ["fico_n", "dti_n"],
   },
 ]
@@ -80,6 +74,7 @@ type Props = {
 }
 
 export function LoanWizard({ submitLabel, onSubmit, pending }: Props) {
+  const t = useT()
   const form = useForm<LoanFormValues>({
     resolver: zodResolver(loanSchema),
     defaultValues: sampleLoan,
@@ -90,6 +85,7 @@ export function LoanWizard({ submitLabel, onSubmit, pending }: Props) {
   const step = STEPS[stepIdx]
   const isLast = stepIdx === STEPS.length - 1
   const progress = Math.round(((stepIdx + 1) / STEPS.length) * 100)
+  const meta = t.wizard.steps[step.id]
 
   const goNext = async () => {
     const valid = await form.trigger(step.fields)
@@ -108,11 +104,10 @@ export function LoanWizard({ submitLabel, onSubmit, pending }: Props) {
       onSubmit={form.handleSubmit(onSubmit)}
       className="flex flex-col gap-6"
     >
-      {/* Header: progress + step indicator */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between text-xs">
           <span className="font-medium uppercase tracking-wider text-zinc-500">
-            Step {stepIdx + 1} of {STEPS.length}
+            {t.wizard.stepLabel} {stepIdx + 1} {t.wizard.of} {STEPS.length}
           </span>
           {stepIdx === 0 && (
             <button
@@ -121,27 +116,25 @@ export function LoanWizard({ submitLabel, onSubmit, pending }: Props) {
               className="inline-flex items-center gap-1 text-xs font-medium text-violet-300 transition-colors hover:text-violet-200"
             >
               <SparklesIcon className="size-3" />
-              Load a sample loan
+              {t.wizard.loadSample}
             </button>
           )}
         </div>
         <Progress value={progress} />
         <div>
           <h3 className="text-lg font-semibold tracking-tight text-zinc-100">
-            {step.title}
+            {meta.title}
           </h3>
-          <p className="text-sm text-zinc-500">{step.subtitle}</p>
+          <p className="text-sm text-zinc-500">{meta.subtitle}</p>
         </div>
       </div>
 
-      {/* Fields for the active step */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {step.fields.map((name) => (
-          <FieldRow key={name} name={name} form={form} />
+          <FieldRow key={name} name={name} form={form} dict={t} />
         ))}
       </div>
 
-      {/* Footer: back/continue/submit */}
       <div className="flex flex-col-reverse gap-2 border-t border-zinc-800/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <Button
           type="button"
@@ -151,16 +144,16 @@ export function LoanWizard({ submitLabel, onSubmit, pending }: Props) {
           disabled={stepIdx === 0 || pending}
         >
           <ArrowLeftIcon className="size-3.5" />
-          Back
+          {t.wizard.back}
         </Button>
 
         {isLast ? (
           <Button type="submit" disabled={pending}>
-            {pending ? "Scoring…" : submitLabel}
+            {pending ? t.wizard.scoring : submitLabel}
           </Button>
         ) : (
           <Button type="button" onClick={goNext} disabled={pending}>
-            Continue
+            {t.wizard.continue}
             <ArrowRightIcon className="size-3.5" />
           </Button>
         )}
@@ -172,11 +165,13 @@ export function LoanWizard({ submitLabel, onSubmit, pending }: Props) {
 function FieldRow({
   name,
   form,
+  dict,
 }: {
   name: FieldName
   form: UseFormReturn<LoanFormValues>
+  dict: Dict
 }) {
-  const spec = getFeatureSpec(name)
+  const spec = getFeatureSpec(dict, name)
   const error = form.formState.errors[name]?.message
 
   return (
@@ -190,7 +185,7 @@ function FieldRow({
             <TooltipTrigger asChild>
               <button
                 type="button"
-                aria-label={`Explain ${spec.label}`}
+                aria-label={spec.label}
                 className="text-zinc-600 transition-colors hover:text-zinc-400"
               >
                 <InfoIcon className="size-3" />
@@ -201,7 +196,7 @@ function FieldRow({
         )}
       </div>
 
-      <FieldControl name={name} form={form} />
+      <FieldControl name={name} form={form} dict={dict} />
 
       {spec.helper && !error && (
         <p className="text-[11px] leading-snug text-zinc-500">{spec.helper}</p>
@@ -214,9 +209,11 @@ function FieldRow({
 function FieldControl({
   name,
   form,
+  dict,
 }: {
   name: FieldName
   form: UseFormReturn<LoanFormValues>
+  dict: Dict
 }) {
   if (name === "purpose") {
     return (
@@ -234,7 +231,7 @@ function FieldControl({
         <SelectContent>
           {PURPOSES.map((p) => (
             <SelectItem key={p} value={p}>
-              {p.replaceAll("_", " ")}
+              {dict.options.purpose[p] ?? p.replaceAll("_", " ")}
             </SelectItem>
           ))}
         </SelectContent>
@@ -260,7 +257,7 @@ function FieldControl({
         <SelectContent>
           {HOME_OWNERSHIPS.map((p) => (
             <SelectItem key={p} value={p}>
-              {p.charAt(0) + p.slice(1).toLowerCase()}
+              {dict.options.homeOwnership[p] ?? p}
             </SelectItem>
           ))}
         </SelectContent>
@@ -306,8 +303,8 @@ function FieldControl({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="1">Yes — 10+ years tenure</SelectItem>
-          <SelectItem value="0">No</SelectItem>
+          <SelectItem value="1">{dict.options.yes}</SelectItem>
+          <SelectItem value="0">{dict.options.no}</SelectItem>
         </SelectContent>
       </Select>
     )
@@ -336,7 +333,6 @@ function FieldControl({
     )
   }
 
-  // numeric default for revenue, loan_amnt, fico_n, dti_n
   const numericStep =
     name === "fico_n" ? 1 : name === "dti_n" ? 0.1 : 100
 

@@ -5,6 +5,7 @@ import { LightbulbIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { LoanWizard } from "@/components/loan-wizard"
+import { RiskDetails } from "@/components/risk-details"
 import { RiskNarrative } from "@/components/risk-narrative"
 import { ShapWaterfall } from "@/components/shap-waterfall"
 import {
@@ -20,13 +21,21 @@ import {
   getFeatureSpec,
 } from "@/lib/feature-labels"
 import { api } from "@/lib/api"
+import { useT } from "@/lib/i18n/provider"
 import { riskBandFromPd } from "@/lib/narrative"
 import type { LoanFormValues } from "@/lib/schemas"
 
 export default function ExplainPage() {
+  const t = useT()
   const mutation = useMutation({
-    mutationFn: (values: LoanFormValues) =>
-      api.explain({ ...values, issue_d: values.issue_d ?? null }),
+    mutationFn: async (values: LoanFormValues) => {
+      const loan = { ...values, issue_d: values.issue_d ?? null }
+      const [prediction, explanation] = await Promise.all([
+        api.predict(loan),
+        api.explain(loan),
+      ])
+      return { prediction, explanation }
+    },
     onError: (e: Error) => toast.error(e.message),
   })
 
@@ -34,15 +43,12 @@ export default function ExplainPage() {
     <div className="space-y-8">
       <Card>
         <CardHeader>
-          <CardTitle>Explain a decision</CardTitle>
-          <CardDescription>
-            Score any loan and see exactly which inputs moved the risk up or
-            down vs. an average loan in the training set.
-          </CardDescription>
+          <CardTitle>{t.advanced.title}</CardTitle>
+          <CardDescription>{t.advanced.subtitle}</CardDescription>
         </CardHeader>
         <CardContent>
           <LoanWizard
-            submitLabel="Explain this loan"
+            submitLabel={t.wizard.explainCta}
             pending={mutation.isPending}
             onSubmit={(v) => mutation.mutate(v)}
           />
@@ -62,11 +68,10 @@ export default function ExplainPage() {
         <Card>
           <CardContent className="space-y-2 py-8 text-center">
             <p className="text-sm font-medium text-red-300">
-              Couldn&rsquo;t reach the model
+              {t.origination.error.title}
             </p>
             <p className="mx-auto max-w-md text-xs leading-relaxed text-zinc-500">
-              HuggingFace Spaces sleeps after inactivity. A cold start can take
-              ~20 seconds — try again in a moment.
+              {t.origination.error.body}
             </p>
           </CardContent>
         </Card>
@@ -81,22 +86,18 @@ export default function ExplainPage() {
                   <LightbulbIcon className="size-3.5" />
                 </span>
                 <CardTitle className="text-base">
-                  How each input moved the risk
+                  {t.advanced.waterfallTitle}
                 </CardTitle>
               </div>
               <CardDescription>
-                Each bar shows how much that one detail pushed the loan&rsquo;s
-                risk up (red) or down (green), compared to an average loan in
-                the training set. Calibrated PD ={" "}
-                <span className="font-mono text-zinc-300">
-                  {(mutation.data.pd_calibrated * 100).toFixed(2)}%
-                </span>
-                .
+                {t.advanced.waterfallSub(
+                  (mutation.data.prediction.pd_calibrated * 100).toFixed(2)
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ShapWaterfall
-                contributions={mutation.data.contributions}
+                contributions={mutation.data.explanation.contributions}
                 topN={10}
               />
             </CardContent>
@@ -106,26 +107,31 @@ export default function ExplainPage() {
             <Card>
               <CardContent className="pt-4">
                 <RiskNarrative
-                  pd={mutation.data.pd_calibrated}
-                  riskBand={riskBandFromPd(mutation.data.pd_calibrated)}
-                  contributions={mutation.data.contributions}
+                  pd={mutation.data.prediction.pd_calibrated}
+                  riskBand={
+                    mutation.data.prediction.risk_band ??
+                    riskBandFromPd(mutation.data.prediction.pd_calibrated)
+                  }
+                  contributions={mutation.data.explanation.contributions}
                 />
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Top 5 drivers</CardTitle>
+                <CardTitle className="text-sm">
+                  {t.advanced.topDrivers}
+                </CardTitle>
                 <CardDescription className="text-xs">
-                  Ranked by absolute SHAP value.
+                  {t.advanced.rankBy}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
-                  {[...mutation.data.top_drivers]
+                  {[...mutation.data.explanation.top_drivers]
                     .slice(0, 5)
                     .map((d) => {
-                      const spec = getFeatureSpec(d.feature)
+                      const spec = getFeatureSpec(t, d.feature)
                       const up = d.shap_value >= 0
                       return (
                         <li
@@ -154,6 +160,16 @@ export default function ExplainPage() {
                       )
                     })}
                 </ul>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <RiskDetails
+                  prediction={mutation.data.prediction}
+                  explanation={mutation.data.explanation}
+                  showTechnical
+                />
               </CardContent>
             </Card>
           </div>

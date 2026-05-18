@@ -3,21 +3,18 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
+import { LangToggle } from "@/components/lang-toggle"
+import { useT } from "@/lib/i18n/provider"
 import { cn } from "@/lib/utils"
-
-const LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/origination", label: "Score" },
-  { href: "/explain", label: "Explain" },
-] as const
-
-const EXTERNAL = [
-  { href: "https://Caio-Fis-credit-risk-api.hf.space/docs", label: "API" },
-  { href: "https://github.com/Caio-Fis/credit-risk-portfolio", label: "GitHub" },
-] as const
 
 export function Nav() {
   const pathname = usePathname()
+  const t = useT()
+
+  const links = [
+    { href: "/", label: t.nav.home },
+    { href: "/origination", label: t.nav.analyze },
+  ]
 
   return (
     <nav className="sticky top-0 z-40 border-b border-zinc-800/70 bg-zinc-950/80 backdrop-blur">
@@ -30,14 +27,16 @@ export function Nav() {
             <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
           </span>
-          Credit Risk{" "}
-          <span className="bg-gradient-to-r from-violet-400 to-emerald-400 bg-clip-text text-transparent">
-            PD
+          <span>
+            Análise de{" "}
+            <span className="bg-gradient-to-r from-violet-400 to-emerald-400 bg-clip-text text-transparent">
+              Crédito
+            </span>
           </span>
         </Link>
 
         <div className="flex items-center gap-1 text-sm text-zinc-400">
-          {LINKS.map((l) => {
+          {links.map((l) => {
             const active =
               l.href === "/" ? pathname === "/" : pathname.startsWith(l.href)
             return (
@@ -57,17 +56,7 @@ export function Nav() {
             )
           })}
           <span className="mx-2 hidden h-4 w-px bg-zinc-800 sm:inline-block" />
-          {EXTERNAL.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              target="_blank"
-              rel="noreferrer"
-              className="hidden rounded-md px-3 py-1.5 transition-colors hover:text-zinc-100 sm:inline-block"
-            >
-              {l.label}
-            </a>
-          ))}
+          <LangToggle />
         </div>
       </div>
     </nav>
