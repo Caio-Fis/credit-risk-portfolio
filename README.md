@@ -3,8 +3,10 @@
 [![CI](https://github.com/Caio-Fis/credit-risk-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/Caio-Fis/credit-risk-portfolio/actions/workflows/ci.yml)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://credit-risk-portfolio-gpnlnaabd9q3ddfubdugz6.streamlit.app)
+[![🤗 HF Spaces](https://img.shields.io/badge/%F0%9F%A4%97_Spaces-credit--risk--api-yellow)](https://huggingface.co/spaces/Caio-Fis/credit-risk-api)
 
-> **Live demo:** [credit-risk-portfolio-gpnlnaabd9q3ddfubdugz6.streamlit.app](https://credit-risk-portfolio-gpnlnaabd9q3ddfubdugz6.streamlit.app)
+> **Streamlit lab:** [credit-risk-portfolio-...streamlit.app](https://credit-risk-portfolio-gpnlnaabd9q3ddfubdugz6.streamlit.app)
+> **Live API (FastAPI on HF Spaces):** [Caio-Fis-credit-risk-api.hf.space/docs](https://Caio-Fis-credit-risk-api.hf.space/docs)
 
 ---
 
@@ -201,6 +203,34 @@ The same trained model is exposed as a FastAPI service (`src/api/`) that
 follows production patterns: Pydantic-typed schemas, lifespan-managed
 artefacts, structured JSON logs, Prometheus metrics, background tasks,
 and a multi-stage Dockerfile ready for HuggingFace Spaces.
+
+### Try it live
+
+The API is deployed on a free [HuggingFace Space](https://huggingface.co/spaces/Caio-Fis/credit-risk-api)
+(Docker SDK, 16 GB RAM, no cold start):
+
+```bash
+SPACE=https://Caio-Fis-credit-risk-api.hf.space
+
+# Calibrated PD + risk band for a single loan
+curl -s -X POST $SPACE/v1/predict \
+  -H 'content-type: application/json' \
+  -d '{"revenue":65000,"dti_n":18.5,"loan_amnt":15000,"fico_n":720,
+       "experience_c":1,"emp_length":5,"purpose":"debt_consolidation",
+       "home_ownership_n":"MORTGAGE","addr_state":"CA","zip_code":"900xx",
+       "issue_d":"2017-06-01"}' | jq .
+
+# SHAP per-feature waterfall
+curl -s -X POST $SPACE/v1/explain -H 'content-type: application/json' -d @loan.json | jq .
+
+# Live drift state (ADWIN + KSWIN + rolling PSI updated by every prediction)
+curl -s $SPACE/v1/monitor/drift/live | jq .
+
+# Prometheus metrics
+curl -s $SPACE/metrics | head -30
+```
+
+Interactive Swagger UI: [Caio-Fis-credit-risk-api.hf.space/docs](https://Caio-Fis-credit-risk-api.hf.space/docs).
 
 ### Architecture
 
