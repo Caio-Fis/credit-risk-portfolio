@@ -56,22 +56,23 @@ export function ShapWaterfall({
           <ReferenceLine x={0} stroke="#52525b" />
           <Tooltip
             cursor={{ fill: "rgba(255,255,255,0.04)" }}
-            contentStyle={{
-              background: "#18181b",
-              border: "1px solid #3f3f46",
-              borderRadius: "0.5rem",
-              fontSize: "0.75rem",
-            }}
-            formatter={(value) => Number(value).toFixed(4)}
-            labelFormatter={(label) => {
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null
               const key = String(label)
               const row = data.find((d) => d.feature === key)
               const friendly = getFeatureLabel(t, key)
-              if (row?.value === undefined || row?.value === null) {
-                return friendly
-              }
-              const formatted = formatFeatureValue(key, row.value)
-              return `${friendly} = ${formatted}`
+              const valueStr =
+                row?.value !== undefined && row?.value !== null
+                  ? formatFeatureValue(key, row.value)
+                  : null
+              return (
+                <div className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs">
+                  <div className="font-medium text-zinc-100">{friendly}</div>
+                  {valueStr && (
+                    <div className="mt-0.5 text-zinc-400">{valueStr}</div>
+                  )}
+                </div>
+              )
             }}
           />
           <Bar dataKey="shap" radius={[0, 3, 3, 0]}>
