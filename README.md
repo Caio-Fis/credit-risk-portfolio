@@ -2,9 +2,11 @@
 
 [![CI](https://github.com/Caio-Fis/credit-risk-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/Caio-Fis/credit-risk-portfolio/actions/workflows/ci.yml)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![Live on Vercel](https://img.shields.io/badge/Live_demo-Vercel-000?logo=vercel&logoColor=white)](https://credit-risk-portfolio.vercel.app)
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://credit-risk-portfolio-gpnlnaabd9q3ddfubdugz6.streamlit.app)
 [![🤗 HF Spaces](https://img.shields.io/badge/%F0%9F%A4%97_Spaces-credit--risk--api-yellow)](https://huggingface.co/spaces/Caio-Fis/credit-risk-api)
 
+> **▶️ Try it (bilingual PT/EN web app):** [credit-risk-portfolio.vercel.app](https://credit-risk-portfolio.vercel.app)
 > **Streamlit lab:** [credit-risk-portfolio-...streamlit.app](https://credit-risk-portfolio-gpnlnaabd9q3ddfubdugz6.streamlit.app)
 > **Live API (FastAPI on HF Spaces):** [Caio-Fis-credit-risk-api.hf.space/docs](https://Caio-Fis-credit-risk-api.hf.space/docs)
 
