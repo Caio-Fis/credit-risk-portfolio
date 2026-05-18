@@ -197,6 +197,26 @@ The Makefile chains are idempotent — re-running skips work whose outputs alrea
 
 ---
 
+## v4 — Next.js frontend
+
+A real back+front: the API above is consumed by a Next.js 16 app in
+[`web/`](web/) that mirrors the `LoanFeatures` schema, calls
+`/v1/predict` and `/v1/explain` from the browser, and renders the SHAP
+contributions with Recharts. Deploys to Vercel (root directory = `web/`).
+
+```bash
+cd web
+cp .env.example .env.local
+npm install
+npm run dev          # http://localhost:3000
+```
+
+Routes: `/` (landing — `GET /v1/models/info`), `/origination`
+(`POST /v1/predict`), `/explain` (`POST /v1/explain`). Full README:
+[`web/README.md`](web/README.md).
+
+---
+
 ## v3 — Production API
 
 The same trained model is exposed as a FastAPI service (`src/api/`) that
