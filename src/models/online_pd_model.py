@@ -19,12 +19,11 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Iterable
 
 import numpy as np
 import pandas as pd
 from loguru import logger
-from river import drift, forest, metrics
+from river import drift, forest
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import brier_score_loss, roc_auc_score
 

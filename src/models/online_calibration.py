@@ -175,6 +175,7 @@ def apply_sliding_calibration(
 
 if __name__ == "__main__":
     import time
+
     from sklearn.metrics import brier_score_loss
 
     from src.config import PROCESSED_DIR

@@ -238,11 +238,11 @@ Interactive Swagger UI: [Caio-Fis-credit-risk-api.hf.space/docs](https://Caio-Fi
 flowchart LR
     User([User / Streamlit / curl])
     subgraph FastAPI [FastAPI · src/api]
-        Pred[/v1/predict<br>predict/batch/]
-        Exp[/v1/explain]
+        Pred["/v1/predict<br>/v1/predict/batch"]
+        Exp["/v1/explain"]
         Mon["/v1/monitor/*<br>(drift · drift/live · calibration)"]
-        Recal[POST /v1/monitor/recalibrate]
-        Metrics[/metrics &amp; /health]
+        Recal["POST /v1/monitor/recalibrate"]
+        Metrics["/metrics &amp; /health"]
     end
     subgraph State [In-process state]
         Reg[ModelRegistry<br>LightGBM + isotonic +<br>TreeExplainer + FRED macro]

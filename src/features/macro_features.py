@@ -13,7 +13,6 @@ Series used (configured in src.config.FRED_SERIES):
 """
 
 from io import StringIO
-from pathlib import Path
 
 import pandas as pd
 import requests

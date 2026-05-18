@@ -16,7 +16,6 @@ from __future__ import annotations
 import time
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from loguru import logger
 
@@ -99,7 +98,8 @@ def main() -> None:
         ax.set_xticklabels([coefs["month"].iloc[i] for i in range(0, len(coefs), max(1, len(coefs) // 12))],
                            rotation=45, ha="right", fontsize=8)
         ax.set_title("Incremental Ridge surrogate coefficients — top 10 features")
-        ax.grid(alpha=0.3); ax.legend(fontsize=7, ncol=2)
+        ax.grid(alpha=0.3)
+        ax.legend(fontsize=7, ncol=2)
         plt.tight_layout()
         fig.savefig(ARTIFACTS_DIR / "ridge_surrogate_coefs.png", dpi=140, bbox_inches="tight")
 

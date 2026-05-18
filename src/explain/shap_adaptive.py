@@ -64,7 +64,6 @@ def rebaselined_shap_monthly(
     """
     df = df.copy().sort_values(date_col).reset_index(drop=True)
     df[date_col] = pd.to_datetime(df[date_col])
-    rng = np.random.default_rng(seed)
 
     months = sorted(df[date_col].dt.to_period("M").unique())
     rows = []
@@ -76,7 +75,6 @@ def rebaselined_shap_monthly(
         if len(background) < 200 or len(target) < 50:
             continue
 
-        bg_sample = background.sample(min(len(background), 1000), random_state=int(period.ordinal) % 1000)
         if len(target) > explain_per_month:
             target = target.sample(explain_per_month, random_state=seed)
 
