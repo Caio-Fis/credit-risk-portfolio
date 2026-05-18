@@ -25,10 +25,24 @@ if [[ -z "${HF_TOKEN:-}" ]]; then
   exit 1
 fi
 
+if ! command -v git-lfs >/dev/null 2>&1; then
+  echo "ERROR: git-lfs is required by HuggingFace Spaces for binary files." >&2
+  echo "Install with:" >&2
+  echo "  sudo dnf install git-lfs       # Fedora / RHEL" >&2
+  echo "  sudo apt install git-lfs       # Debian / Ubuntu" >&2
+  echo "  brew install git-lfs           # macOS" >&2
+  exit 1
+fi
+
 echo "==> Cloning ${SPACE_URL} into ${SPACE_DIR}"
 # Use the token in the clone URL too so the credential helper doesn't prompt.
 AUTH_URL="https://${HF_USER}:${HF_TOKEN}@huggingface.co/spaces/${HF_USER}/${HF_SPACE}"
 git clone "${AUTH_URL}" "${SPACE_DIR}"
+
+echo "==> Enabling git-lfs and tracking model/parquet binaries"
+git -C "${SPACE_DIR}" lfs install --local --skip-smudge >/dev/null
+# Patterns that HF Spaces requires to go through LFS/Xet
+git -C "${SPACE_DIR}" lfs track "*.joblib" "*.parquet" >/dev/null
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
