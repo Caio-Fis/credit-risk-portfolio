@@ -302,7 +302,17 @@ export const enDict: Dict = {
       tooltip:
         "US unemployment rate the month of origination. Higher unemployment → more defaults.",
     },
+    us_unemployment: {
+      label: "Unemployment at issue",
+      tooltip:
+        "US unemployment rate the month of origination. Higher unemployment → more defaults.",
+    },
     fed_funds_rate: {
+      label: "Policy rate at issue",
+      tooltip:
+        "US Federal Funds rate at origination. Tighter monetary policy stresses borrowers.",
+    },
+    us_fed_funds: {
       label: "Policy rate at issue",
       tooltip:
         "US Federal Funds rate at origination. Tighter monetary policy stresses borrowers.",
@@ -311,6 +321,16 @@ export const enDict: Dict = {
       label: "GDP year-over-year",
       tooltip:
         "US GDP year-over-year growth. Recessions (negative growth) lift defaults.",
+    },
+    us_gdp_yoy: {
+      label: "GDP year-over-year",
+      tooltip:
+        "US GDP year-over-year growth. Recessions (negative growth) lift defaults.",
+    },
+    us_cpi_yoy: {
+      label: "Inflation at issue",
+      tooltip:
+        "US year-over-year CPI inflation. High inflation erodes the borrower's real income.",
     },
   } as Record<string, { label: string; helper?: string; tooltip?: string }>,
 

@@ -305,7 +305,17 @@ export const ptDict = {
       tooltip:
         "Taxa de desemprego dos EUA no mês da originação. Maior desemprego = mais inadimplência.",
     },
+    us_unemployment: {
+      label: "Desemprego no mês",
+      tooltip:
+        "Taxa de desemprego dos EUA no mês da originação. Maior desemprego = mais inadimplência.",
+    },
     fed_funds_rate: {
+      label: "Juros básicos no mês",
+      tooltip:
+        "Taxa básica de juros dos EUA no momento da originação. Aperto monetário pressiona o tomador.",
+    },
+    us_fed_funds: {
       label: "Juros básicos no mês",
       tooltip:
         "Taxa básica de juros dos EUA no momento da originação. Aperto monetário pressiona o tomador.",
@@ -314,6 +324,16 @@ export const ptDict = {
       label: "Crescimento do PIB",
       tooltip:
         "Crescimento ano contra ano do PIB. Recessão (negativo) aumenta a inadimplência.",
+    },
+    us_gdp_yoy: {
+      label: "Crescimento do PIB",
+      tooltip:
+        "Crescimento ano contra ano do PIB dos EUA. Recessão (negativo) aumenta a inadimplência.",
+    },
+    us_cpi_yoy: {
+      label: "Inflação no mês",
+      tooltip:
+        "Inflação ano contra ano (CPI) dos EUA. Inflação alta corrói a renda real do tomador.",
     },
   } as Record<
     string,

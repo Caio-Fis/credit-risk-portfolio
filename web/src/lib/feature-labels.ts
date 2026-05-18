@@ -16,8 +16,12 @@ const FORMATTERS: Record<string, (v: unknown) => string> = {
   dti_n: pct,
   int_rate: pct,
   unemployment_rate: pct,
+  us_unemployment: pct,
   fed_funds_rate: pct,
+  us_fed_funds: pct,
   gdp_yoy: pct,
+  us_gdp_yoy: pct,
+  us_cpi_yoy: pct,
   emp_length: years,
   experience_c: (v) => (v === 1 || v === "1" ? "✓" : "—"),
   purpose: (v) =>

@@ -11,6 +11,11 @@ import {
   YAxis,
 } from "recharts"
 
+import {
+  formatFeatureValue,
+  getFeatureLabel,
+} from "@/lib/feature-labels"
+import { useT } from "@/lib/i18n/provider"
 import type { ExplanationResponse } from "@/lib/api"
 
 type Contribution = ExplanationResponse["contributions"][number]
@@ -22,6 +27,8 @@ export function ShapWaterfall({
   contributions: Contribution[]
   topN?: number
 }) {
+  const t = useT()
+
   const top = [...contributions]
     .sort((a, b) => Math.abs(b.shap_value) - Math.abs(a.shap_value))
     .slice(0, topN)
@@ -42,8 +49,9 @@ export function ShapWaterfall({
             type="category"
             dataKey="feature"
             stroke="#71717a"
-            width={140}
+            width={180}
             tick={{ fontSize: 11 }}
+            tickFormatter={(key) => getFeatureLabel(t, String(key))}
           />
           <ReferenceLine x={0} stroke="#52525b" />
           <Tooltip
@@ -58,7 +66,12 @@ export function ShapWaterfall({
             labelFormatter={(label) => {
               const key = String(label)
               const row = data.find((d) => d.feature === key)
-              return `${key}${row?.value !== undefined && row.value !== null ? ` = ${row.value}` : ""}`
+              const friendly = getFeatureLabel(t, key)
+              if (row?.value === undefined || row?.value === null) {
+                return friendly
+              }
+              const formatted = formatFeatureValue(key, row.value)
+              return `${friendly} = ${formatted}`
             }}
           />
           <Bar dataKey="shap" radius={[0, 3, 3, 0]}>
