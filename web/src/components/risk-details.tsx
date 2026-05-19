@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { InfoIcon } from "lucide-react"
 
 import {
@@ -13,13 +14,22 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { ShapWaterfall } from "@/components/shap-waterfall"
 import {
   formatFeatureValue,
   getFeatureSpec,
 } from "@/lib/feature-labels"
 import { useT } from "@/lib/i18n/provider"
 import type { ExplanationResponse, PredictionResponse } from "@/lib/api"
+
+// recharts is heavy (~700 KB chunk). Only loaded when the technical
+// drivers accordion actually renders (advanced view).
+const ShapWaterfall = dynamic(
+  () =>
+    import("@/components/shap-waterfall").then((m) => ({
+      default: m.ShapWaterfall,
+    })),
+  { ssr: false },
+)
 
 type Props = {
   prediction: PredictionResponse
