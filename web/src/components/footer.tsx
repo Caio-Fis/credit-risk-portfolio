@@ -6,7 +6,7 @@ export function Footer() {
   const t = useT()
   return (
     <footer className="relative z-10 border-t border-zinc-800/70 py-6">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 text-xs text-zinc-500 sm:flex-row">
+      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 text-xs text-zinc-400 sm:flex-row">
         <p>{t.footer.tagline}</p>
         <div className="flex items-center gap-4">
           <a

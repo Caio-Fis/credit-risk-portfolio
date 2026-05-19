@@ -132,7 +132,7 @@ function HowItWorks() {
         <h2 className="text-2xl font-semibold tracking-tight">
           {t.home.how.title}
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">{t.home.how.sub}</p>
+        <p className="mt-1 text-sm text-zinc-400">{t.home.how.sub}</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
         {t.home.how.steps.map((s, i) => {

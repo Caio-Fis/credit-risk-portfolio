@@ -30,7 +30,7 @@ export function TrustSignals() {
         <h2 className="text-2xl font-semibold tracking-tight">
           {t.home.trust.heading}
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">{t.home.trust.sub}</p>
+        <p className="mt-1 text-sm text-zinc-400">{t.home.trust.sub}</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -45,7 +45,7 @@ export function TrustSignals() {
             <p className="text-3xl font-semibold tabular-nums tracking-tight text-zinc-100">
               {s.value}
             </p>
-            <div className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
+            <div className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
               <span>{s.label}</span>
               {s.tooltip && (
                 <Tooltip>
@@ -53,7 +53,7 @@ export function TrustSignals() {
                     <button
                       type="button"
                       aria-label={s.label}
-                      className="text-zinc-600 transition-colors hover:text-zinc-400"
+                      className="text-zinc-500 transition-colors hover:text-zinc-300"
                     >
                       <InfoIcon className="size-3" />
                     </button>
