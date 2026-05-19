@@ -76,3 +76,8 @@ export function useT(): Dict {
 export function useLang(): Lang {
   return useI18n().lang
 }
+
+/** BCP-47 locale string for Intl.* APIs (toLocaleDateString, etc.). */
+export function useLocale(): string {
+  return useI18n().lang === "pt" ? "pt-BR" : "en-US"
+}

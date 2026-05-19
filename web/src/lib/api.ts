@@ -4,6 +4,18 @@ export type LoanFeatures = components["schemas"]["LoanFeatures"]
 export type PredictionResponse = components["schemas"]["PredictionResponse"]
 export type ExplanationResponse = components["schemas"]["ExplanationResponse"]
 export type ModelInfoResponse = components["schemas"]["ModelInfoResponse"]
+export type DriftMonitorResponse = components["schemas"]["DriftMonitorResponse"]
+export type LiveDriftResponse = components["schemas"]["LiveDriftResponse"]
+export type CalibrationMonitorResponse =
+  components["schemas"]["CalibrationMonitorResponse"]
+export type ChampionChallengerResponse =
+  components["schemas"]["ChampionChallengerResponse"]
+export type RollingVsFrozenResponse =
+  components["schemas"]["RollingVsFrozenResponse"]
+export type AdaptiveShapResponse =
+  components["schemas"]["AdaptiveShapResponse"]
+export type RecalibrationTriggerResponse =
+  components["schemas"]["RecalibrationTriggerResponse"]
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://Caio-Fis-credit-risk-api.hf.space"
@@ -45,6 +57,21 @@ export const api = {
     request<ExplanationResponse>("/v1/explain", {
       method: "POST",
       body: JSON.stringify(loan),
+    }),
+  drift: () => request<DriftMonitorResponse>("/v1/monitor/drift"),
+  driftLive: () => request<LiveDriftResponse>("/v1/monitor/drift/live"),
+  calibration: () =>
+    request<CalibrationMonitorResponse>("/v1/monitor/calibration"),
+  championVsChallenger: () =>
+    request<ChampionChallengerResponse>("/v1/monitor/champion-vs-challenger"),
+  rollingVsFrozen: () =>
+    request<RollingVsFrozenResponse>("/v1/monitor/rolling-vs-frozen"),
+  adaptiveShap: () =>
+    request<AdaptiveShapResponse>("/v1/explain/adaptive-shap"),
+  recalibrate: (trigger: "manual" | "scheduled" | "drift" = "manual") =>
+    request<RecalibrationTriggerResponse>("/v1/monitor/recalibrate", {
+      method: "POST",
+      body: JSON.stringify({ trigger }),
     }),
 }
 

@@ -12,6 +12,8 @@ export const enDict: Dict = {
     home: "Home",
     analyze: "Analyze",
     advanced: "Advanced view",
+    monitor: "Monitor",
+    insights: "Insights",
     toggleTo: "PT",
     toggleAria: "Switch to Portuguese",
     live: "Online",
@@ -333,6 +335,112 @@ export const enDict: Dict = {
         "US year-over-year CPI inflation. High inflation erodes the borrower's real income.",
     },
   } as Record<string, { label: string; helper?: string; tooltip?: string }>,
+
+  deeper: {
+    eyebrow: "For technical teams",
+    title: "Go deeper into the model",
+    sub: "Two dedicated views for people who want to understand how the model behaves across time and across risk buckets.",
+    monitor: {
+      title: "Monitor — model health",
+      body: "Track drift, calibration and retraining uplift year by year. Built for risk and ops teams.",
+      cta: "Open monitor",
+    },
+    insights: {
+      title: "Insights — explanations over time",
+      body: "See how each factor gained or lost weight in decisions between 2014 and 2017, and how it shifts across risk buckets.",
+      cta: "Open insights",
+    },
+  },
+
+  monitor: {
+    title: "Monitoring — how the model holds up over time",
+    subtitle:
+      "Portfolio behaviour shifts, retraining uplift, and yearly calibration health. Built for risk and ops teams.",
+    error: {
+      title: "Could not load monitoring data",
+      body: "The API sleeps when idle. Refresh in a few seconds.",
+    },
+    drift: {
+      title: "Portfolio behaviour shifts",
+      sub: "Statistical detectors (ADWIN on error, KSWIN on score distribution) flag when the market turned and the model needs attention.",
+      total: "Total events",
+      lastEvent: "Last event",
+      perYearTitle: "Events per year",
+      perDetectorTitle: "By detector",
+      recentTitle: "Recent events",
+      empty: "No events recorded.",
+      detectorAdwin: "ADWIN (error)",
+      detectorKswin: "KSWIN (score)",
+    },
+    calibration: {
+      title: "Calibration over the years",
+      sub: "Calibration is the promise that '20% risk' means, on average, 20% actual default. The sliding curve refits the calibration month by month — keeping the promise even as the market shifts.",
+      auroc: "AUROC",
+      brier: "Brier",
+      slope: "Slope",
+      raw: "Raw",
+      static: "Static calibration",
+      sliding: "Sliding calibration",
+      improvementCaption: (pct: string) =>
+        `Sliding calibration improves Brier by ${pct} points vs static.`,
+      lastRefit: "Last refit:",
+      recalibrate: "Trigger recalibration",
+      recalibrateRunning: "Triggering…",
+      recalibrateSuccess: "Recalibration enqueued — job {id}.",
+      recalibrateError: "Failed to trigger recalibration.",
+    },
+    champion: {
+      title: "Static champion vs online challenger",
+      sub: "The primary model (LightGBM, trained once) reaches ~0.65 AUROC. The online challenger (River's ARF with a 90-day label delay) only hits ~0.54 — confirming that retraining with richer signal beats per-row learning on this 11-feature universe.",
+      auroc: "Yearly AUROC",
+      ks: "Yearly KS",
+      mean: "Challenger averages",
+      note: "Honest note:",
+    },
+    rolling: {
+      title: "Retrain yearly vs freeze at 2013",
+      sub: "Train once and freeze, and the model loses up to 4.6 pp of AUROC and 7 pp of KS after a few years. Retraining yearly closes the gap — this is the data-driven argument for the maintenance effort.",
+      uplift: "Average retraining uplift",
+      auroc: "Yearly AUROC",
+      ks: "Yearly KS",
+      yearsOverlap: "Years compared",
+      legendRolling: "Retrained",
+      legendFrozen: "Frozen at 2013",
+    },
+  },
+
+  insights: {
+    title: "Explanations over time",
+    subtitle:
+      "Which factors gained or lost weight in decisions across the years, and how they shift across risk buckets. Built for due diligence and model understanding, not for the approval flow.",
+    error: {
+      title: "Could not load insights",
+      body: "The API sleeps when idle. Refresh in a few seconds.",
+    },
+    heatmap: {
+      title: "Monthly factor influence",
+      sub: "Each cell shows how much that factor (row) weighed on decisions in that month (column). Warmer = more weight. The SHAP background is rebased monthly (Adaptive SHAP).",
+      featureAxis: "Factor",
+      monthAxis: "Month",
+      legend: "Mean |SHAP|",
+    },
+    decile: {
+      title: "Influence by risk bucket",
+      sub: "Loans were bucketed into 10 deciles by predicted risk. This view shows which factors dominate each bucket — FICO rules the low decile, while debt load and geography weigh more in the high deciles.",
+      lowestDecile: "Lowest risk (decile 0)",
+      highestDecile: "Highest risk (decile 9)",
+      mediumLabel: "Mid (decile 5)",
+    },
+    ridge: {
+      title: "Linear surrogate coefficients",
+      sub: "An incremental Ridge regression approximates the model's decisions in logit space. Its coefficients over time reveal which factors the model actually uses — and when the macro context enters or leaves the picture.",
+      featureToggle: "Show factor",
+      empty: "No surrogate data yet.",
+    },
+    references: {
+      title: "References",
+    },
+  },
 
   options: {
     purpose: {

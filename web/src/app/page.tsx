@@ -7,6 +7,7 @@ import {
   ClipboardCheckIcon,
   GaugeIcon,
   LightbulbIcon,
+  LineChartIcon,
   RefreshCwIcon,
   ShieldCheckIcon,
 } from "lucide-react"
@@ -29,6 +30,7 @@ export default function Home() {
       <ValueCards />
       <TrustSignals />
       <HowItWorks />
+      <DeeperViews />
     </div>
   )
 }
@@ -118,6 +120,73 @@ function ValueCards() {
           </CardContent>
         </Card>
       ))}
+    </section>
+  )
+}
+
+function DeeperViews() {
+  const t = useT()
+  const cards = [
+    {
+      icon: ActivityIcon,
+      href: "/monitor",
+      ...t.deeper.monitor,
+      accent: "from-emerald-500/20 to-emerald-500/0",
+      iconBg: "bg-emerald-500/15 text-emerald-300",
+    },
+    {
+      icon: LineChartIcon,
+      href: "/insights",
+      ...t.deeper.insights,
+      accent: "from-orange-500/20 to-orange-500/0",
+      iconBg: "bg-orange-500/15 text-orange-300",
+    },
+  ]
+  return (
+    <section className="space-y-6">
+      <div>
+        <Badge
+          variant="outline"
+          className="border-zinc-700/60 bg-zinc-900/40 text-[10px] text-zinc-400"
+        >
+          {t.deeper.eyebrow}
+        </Badge>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight">
+          {t.deeper.title}
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm text-zinc-400">{t.deeper.sub}</p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {cards.map((c) => (
+          <Link
+            key={c.href}
+            href={c.href}
+            className="group block"
+          >
+            <Card className="relative h-full overflow-hidden ring-1 ring-zinc-800/80 transition-colors group-hover:ring-zinc-700">
+              <div
+                className={`pointer-events-none absolute -inset-x-12 -top-24 h-32 bg-gradient-to-b ${c.accent} blur-2xl`}
+                aria-hidden
+              />
+              <CardHeader className="relative">
+                <span
+                  className={`mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg ${c.iconBg}`}
+                >
+                  <c.icon className="size-4" />
+                </span>
+                <CardTitle className="text-base">{c.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="relative space-y-3 text-sm leading-relaxed text-zinc-400">
+                <p>{c.body}</p>
+                <span className="inline-flex items-center gap-1 text-xs text-zinc-300 transition-colors group-hover:text-zinc-100">
+                  {c.cta}
+                  <ArrowRightIcon className="size-3.5" />
+                </span>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
     </section>
   )
 }

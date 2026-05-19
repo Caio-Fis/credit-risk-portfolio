@@ -106,6 +106,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/explain/adaptive-shap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Adaptive SHAP surfaces — monthly heatmap, per-decile attribution, ridge surrogate */
+        get: operations["adaptive_shap_v1_explain_adaptive_shap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/monitor/drift": {
         parameters: {
             query?: never;
@@ -132,6 +149,40 @@ export interface paths {
         };
         /** Live drift state (current process) */
         get: operations["drift_live_v1_monitor_drift_live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/monitor/champion-vs-challenger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Yearly metrics for the ARF challenger replay */
+        get: operations["champion_vs_challenger_v1_monitor_champion_vs_challenger_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/monitor/rolling-vs-frozen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** LightGBM retrained yearly vs frozen at 2013 */
+        get: operations["rolling_vs_frozen_v1_monitor_rolling_vs_frozen_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -178,6 +229,44 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdaptiveShapResponse */
+        AdaptiveShapResponse: {
+            /**
+             * Heatmap
+             * @description Mean |SHAP| per (month, feature). Background rebased monthly.
+             */
+            heatmap: components["schemas"]["ShapHeatmapCell"][];
+            /**
+             * By Decile
+             * @description Per-decile SHAP attribution for the latest scoring window.
+             */
+            by_decile: components["schemas"]["ShapDecileCell"][];
+            /**
+             * Ridge Surrogate
+             * @description Monthly incremental Ridge surrogate coefficients in logit space.
+             */
+            ridge_surrogate: components["schemas"]["RidgeCoefRow"][];
+            /**
+             * Top Features
+             * @description Top features by overall mean |SHAP|.
+             */
+            top_features: string[];
+            /**
+             * Months
+             * @description Sorted month buckets present in the heatmap.
+             */
+            months: string[];
+            /**
+             * Deciles
+             * @description Sorted deciles present in by_decile.
+             */
+            deciles: number[];
+            /**
+             * References
+             * @description Papers/methods this surface replicates.
+             */
+            references?: string[];
+        };
         /** BatchPredictionRequest */
         BatchPredictionRequest: {
             /** Loans */
@@ -234,6 +323,42 @@ export interface components {
             slope_static: number;
             /** Slope Sliding */
             slope_sliding: number;
+        };
+        /** ChampionChallengerResponse */
+        ChampionChallengerResponse: {
+            /** Yearly */
+            yearly: components["schemas"]["ChampionChallengerYearly"][];
+            /**
+             * Summary
+             * @description Mean AUROC/KS/Brier across years for the ARF challenger replay.
+             */
+            summary: {
+                [key: string]: number;
+            };
+            /**
+             * Note
+             * @description Editorial note: ARF underperforms the LightGBM champion on this dataset (~0.54 vs ~0.65 AUROC). Kept as drift detector, not primary model.
+             */
+            note: string;
+            /** Source */
+            source: string;
+        };
+        /** ChampionChallengerYearly */
+        ChampionChallengerYearly: {
+            /** Year */
+            year: number;
+            /** N Test */
+            n_test: number;
+            /** Base Rate Test */
+            base_rate_test: number;
+            /** Auroc */
+            auroc: number;
+            /** Ks */
+            ks: number;
+            /** Brier */
+            brier: number;
+            /** Calib Slope */
+            calib_slope: number;
         };
         /** DriftEvent */
         DriftEvent: {
@@ -521,6 +646,78 @@ export interface components {
             /** Detail */
             detail?: string | null;
         };
+        /** RidgeCoefRow */
+        RidgeCoefRow: {
+            /** Month */
+            month: string;
+            /** Coefs */
+            coefs: {
+                [key: string]: number;
+            };
+        };
+        /** RollingOOTYearly */
+        RollingOOTYearly: {
+            /** Year */
+            year: number;
+            /** N Test */
+            n_test: number;
+            /** Auroc */
+            auroc: number;
+            /** Ks */
+            ks: number;
+            /** Brier */
+            brier: number;
+            /** Calib Slope */
+            calib_slope: number;
+        };
+        /** RollingVsFrozenResponse */
+        RollingVsFrozenResponse: {
+            /**
+             * Rolling
+             * @description LightGBM retrained yearly, evaluated on next year.
+             */
+            rolling: components["schemas"]["RollingOOTYearly"][];
+            /**
+             * Frozen
+             * @description LightGBM frozen at 2013 cut, evaluated on later years.
+             */
+            frozen: components["schemas"]["RollingOOTYearly"][];
+            /**
+             * Summary
+             * @description Mean uplift of rolling over frozen (AUROC, KS, Brier).
+             */
+            summary: {
+                [key: string]: number;
+            };
+            /** Source */
+            source: {
+                [key: string]: string;
+            };
+        };
+        /** ShapDecileCell */
+        ShapDecileCell: {
+            /**
+             * Decile
+             * @description Risk decile (0 = lowest predicted PD, 9 = highest).
+             */
+            decile: number;
+            /** Feature */
+            feature: string;
+            /** Mean Abs Shap */
+            mean_abs_shap: number;
+        };
+        /** ShapHeatmapCell */
+        ShapHeatmapCell: {
+            /**
+             * Month
+             * @description YYYY-MM bucket.
+             */
+            month: string;
+            /** Feature */
+            feature: string;
+            /** Mean Abs Shap */
+            mean_abs_shap: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -702,6 +899,26 @@ export interface operations {
             };
         };
     };
+    adaptive_shap_v1_explain_adaptive_shap_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdaptiveShapResponse"];
+                };
+            };
+        };
+    };
     drift_status_v1_monitor_drift_get: {
         parameters: {
             query?: never;
@@ -738,6 +955,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveDriftResponse"];
+                };
+            };
+        };
+    };
+    champion_vs_challenger_v1_monitor_champion_vs_challenger_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChampionChallengerResponse"];
+                };
+            };
+        };
+    };
+    rolling_vs_frozen_v1_monitor_rolling_vs_frozen_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RollingVsFrozenResponse"];
                 };
             };
         };

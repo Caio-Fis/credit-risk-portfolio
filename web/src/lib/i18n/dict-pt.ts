@@ -12,6 +12,8 @@ export const ptDict = {
     home: "Início",
     analyze: "Analisar",
     advanced: "Modo avançado",
+    monitor: "Monitor",
+    insights: "Insights",
     toggleTo: "EN",
     toggleAria: "Mudar para inglês",
     live: "Online",
@@ -339,6 +341,112 @@ export const ptDict = {
     string,
     { label: string; helper?: string; tooltip?: string }
   >,
+
+  deeper: {
+    eyebrow: "Para times técnicos",
+    title: "Vá mais fundo no modelo",
+    sub: "Duas vistas dedicadas para quem quer entender o comportamento do modelo ao longo do tempo e em diferentes faixas de risco.",
+    monitor: {
+      title: "Monitor — saúde do modelo",
+      body: "Acompanhe drift, calibração e ganho de retreino ano a ano. Pensado para times de risco e ops.",
+      cta: "Abrir monitor",
+    },
+    insights: {
+      title: "Insights — explicações ao longo do tempo",
+      body: "Veja como cada fator ganhou ou perdeu peso na decisão entre 2014 e 2017, e como muda por faixa de risco.",
+      cta: "Abrir insights",
+    },
+  },
+
+  monitor: {
+    title: "Monitoramento — como o modelo se sustenta ao longo do tempo",
+    subtitle:
+      "Mudanças de comportamento do portfólio, ganho de retreinar e calibração ao longo dos anos. Pensado para times de risco e ops.",
+    error: {
+      title: "Não foi possível carregar os dados de monitoramento",
+      body: "A API fica em standby quando ociosa. Recarregue em alguns segundos.",
+    },
+    drift: {
+      title: "Eventos de mudança no comportamento",
+      sub: "Detectores estatísticos (ADWIN sobre erro, KSWIN sobre distribuição do score) sinalizam quando o mercado virou e o modelo precisa de atenção.",
+      total: "Eventos totais",
+      lastEvent: "Último evento",
+      perYearTitle: "Eventos por ano",
+      perDetectorTitle: "Por detector",
+      recentTitle: "Eventos recentes",
+      empty: "Nenhum evento registrado.",
+      detectorAdwin: "ADWIN (erro)",
+      detectorKswin: "KSWIN (score)",
+    },
+    calibration: {
+      title: "Calibração ao longo dos anos",
+      sub: "Calibração é a promessa de que '20% de risco' significa, na média, 20% de inadimplência real. A curva sliding ajusta a calibração mês a mês — mantém a promessa mesmo quando o mercado muda.",
+      auroc: "AUROC",
+      brier: "Brier",
+      slope: "Slope",
+      raw: "Bruto",
+      static: "Calibração estática",
+      sliding: "Calibração móvel",
+      improvementCaption: (pct: string) =>
+        `Calibração móvel melhora o Brier em ${pct} pontos vs. estática.`,
+      lastRefit: "Último refit:",
+      recalibrate: "Disparar recalibração",
+      recalibrateRunning: "Disparando…",
+      recalibrateSuccess: "Recalibração agendada — job {id}.",
+      recalibrateError: "Falha ao disparar recalibração.",
+    },
+    champion: {
+      title: "Campeão estático vs. challenger online",
+      sub: "O modelo principal (LightGBM treinado uma vez) entrega ~0,65 AUROC. O challenger online (ARF do River, com delay de 90 dias para o rótulo) só atinge ~0,54 — confirmando que retreinar com mais sinal vence aprender ponto a ponto neste universo de 11 features.",
+      auroc: "AUROC anual",
+      ks: "KS anual",
+      mean: "Médias do challenger",
+      note: "Nota de honestidade:",
+    },
+    rolling: {
+      title: "Retreinar todo ano vs. congelar em 2013",
+      sub: "Treinar uma vez e travar (congelado) faz o modelo perder até 4,6 p.p. de AUROC e 7 p.p. de KS depois de alguns anos. Retreinar anualmente recupera o desempenho — é o argumento de dados para o esforço de manutenção.",
+      uplift: "Ganho médio do retreino",
+      auroc: "AUROC anual",
+      ks: "KS anual",
+      yearsOverlap: "Anos comparados",
+      legendRolling: "Retreinado",
+      legendFrozen: "Congelado em 2013",
+    },
+  },
+
+  insights: {
+    title: "Explicações ao longo do tempo",
+    subtitle:
+      "Quais fatores ganharam ou perderam peso na decisão ao longo dos anos, e como mudam por faixa de risco. Vista pensada para due-diligence e para entender o modelo, não para usar no fluxo de aprovação.",
+    error: {
+      title: "Não foi possível carregar os insights",
+      body: "A API fica em standby quando ociosa. Recarregue em alguns segundos.",
+    },
+    heatmap: {
+      title: "Influência mensal de cada fator",
+      sub: "Cada célula mostra o quanto aquele fator (linha) pesou nas decisões daquele mês (coluna). Cores mais quentes = mais peso. Background SHAP é rebaseado mês a mês (Adaptive SHAP).",
+      featureAxis: "Fator",
+      monthAxis: "Mês",
+      legend: "|SHAP| médio",
+    },
+    decile: {
+      title: "Influência por faixa de risco",
+      sub: "Empréstimos foram agrupados em 10 decis pelo risco previsto. Esta vista mostra quais fatores dominam cada faixa — o FICO governa o decil baixo, comprometimento e geografia pesam mais nos decis altos.",
+      lowestDecile: "Menor risco (decil 0)",
+      highestDecile: "Maior risco (decil 9)",
+      mediumLabel: "Médio (decil 5)",
+    },
+    ridge: {
+      title: "Coeficientes do surrogate linear",
+      sub: "Uma regressão Ridge incremental aproxima as decisões do modelo no espaço logit. Os coeficientes ao longo do tempo mostram quais fatores o modelo realmente está usando — e quando o macro entra ou sai do jogo.",
+      featureToggle: "Mostrar fator",
+      empty: "Sem dados de surrogate ainda.",
+    },
+    references: {
+      title: "Referências",
+    },
+  },
 
   // Friendly names for select options.
   options: {
