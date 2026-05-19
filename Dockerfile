@@ -33,7 +33,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY src/ ./src/
 COPY artifacts/pd_model_lc.joblib artifacts/pd_calibrator_lc.joblib ./artifacts/
 COPY data/processed/macro_features.parquet ./data/processed/
-COPY data/processed/arf_drifts_lc.csv data/processed/sliding_calibration_lc.csv ./data/processed/
+COPY data/processed/arf_drifts_lc.csv \
+     data/processed/sliding_calibration_lc.csv \
+     data/processed/arf_yearly_lc.csv \
+     data/processed/rolling_oot_lc.csv \
+     data/processed/frozen_oot_lc.csv \
+     data/processed/adaptive_shap_monthly.csv \
+     data/processed/adaptive_shap_by_decile.csv \
+     data/processed/ridge_surrogate_coefs.csv \
+     ./data/processed/
 COPY data/schemas/ ./data/schemas/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
