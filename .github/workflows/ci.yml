@@ -110,6 +110,11 @@ jobs:
           HF_SPACE: ${{ secrets.HF_SPACE }}   # e.g. credit-risk-api
         if: env.HF_TOKEN != '' && env.HF_USER != '' && env.HF_SPACE != ''
         run: |
+          # The Space's root README needs the YAML frontmatter (sdk, app_port,
+          # …) that lives in hf_space/README.md. Swap them in the runner's
+          # working tree before upload so the Space recognises the config.
+          cp hf_space/README.md README.md
+
           python - <<'PY'
           import os
           from huggingface_hub import HfApi
@@ -137,6 +142,7 @@ jobs:
                   "tasks/**",
                   "docs/**",
                   "tests/**",
+                  "hf_space/**",
                   "**/__pycache__/**",
                   "**/.pytest_cache/**",
                   "**/.ruff_cache/**",
