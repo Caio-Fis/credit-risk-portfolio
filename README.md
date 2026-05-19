@@ -213,9 +213,17 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-Routes: `/` (landing — `GET /v1/models/info`), `/origination`
-(`POST /v1/predict`), `/explain` (`POST /v1/explain`). Full README:
-[`web/README.md`](web/README.md).
+Routes:
+
+| Route | Audience | API calls |
+|---|---|---|
+| `/` | Landing — bilingual PT/EN | `GET /v1/models/info` |
+| `/origination` | Analyst flow — wizard + plain-English narrative | `POST /v1/predict`, `POST /v1/explain` |
+| `/explain` | Advanced view — SHAP waterfall + macro context | `POST /v1/predict`, `POST /v1/explain` |
+| `/monitor` | Risk & ops — drift timeline, calibration trend, retraining uplift, champion vs challenger | `GET /v1/monitor/{drift,calibration,champion-vs-challenger,rolling-vs-frozen}`, `POST /v1/monitor/recalibrate` |
+| `/insights` | Due-diligence — adaptive SHAP heatmap (month × feature), per-decile attribution, Ridge surrogate over time | `GET /v1/explain/adaptive-shap` |
+
+Full frontend README: [`web/README.md`](web/README.md).
 
 ---
 
@@ -262,7 +270,8 @@ flowchart LR
     subgraph FastAPI [FastAPI · src/api]
         Pred["/v1/predict<br>/v1/predict/batch"]
         Exp["/v1/explain"]
-        Mon["/v1/monitor/*<br>(drift · drift/live · calibration)"]
+        Mon["/v1/monitor/*<br>(drift · drift/live · calibration ·<br>champion-vs-challenger · rolling-vs-frozen)"]
+        AdaptExp["/v1/explain/adaptive-shap"]
         Recal["POST /v1/monitor/recalibrate"]
         Metrics["/metrics &amp; /health"]
     end
@@ -274,10 +283,11 @@ flowchart LR
         Joblib[(pd_model_lc.joblib<br>pd_calibrator_lc.joblib)]
         Parquet[(macro_features.parquet<br>arf_drifts_lc.csv<br>sliding_calibration_lc.csv)]
     end
-    User --> Pred & Exp & Mon & Recal & Metrics
+    User --> Pred & Exp & Mon & Recal & Metrics & AdaptExp
     Pred --> Reg
     Pred -. update .-> Live
     Exp --> Reg
+    AdaptExp --> Parquet
     Mon --> Live & Parquet
     Recal -. queues .-> Live
     Reg --> Joblib & Parquet
@@ -292,9 +302,12 @@ flowchart LR
 | POST | `/v1/predict` | Calibrated PD for one loan |
 | POST | `/v1/predict/batch` | Up to 1000 loans |
 | POST | `/v1/explain` | SHAP contributions + top 5 drivers |
+| GET | `/v1/explain/adaptive-shap` | Monthly SHAP heatmap, per-decile attribution, Ridge surrogate |
 | GET | `/v1/monitor/drift` | Historical ARF stream replay |
 | GET | `/v1/monitor/drift/live` | **Live** ADWIN + KSWIN + PSI from in-process state |
 | GET | `/v1/monitor/calibration` | Rolling Brier / slope / refit timestamp |
+| GET | `/v1/monitor/champion-vs-challenger` | Yearly metrics of the ARF challenger replay |
+| GET | `/v1/monitor/rolling-vs-frozen` | LightGBM retrained yearly vs frozen at 2013 |
 | POST | `/v1/monitor/recalibrate` | Trigger background sliding-window refit (202) |
 | GET | `/metrics` | Prometheus exposition |
 | GET | `/docs`, `/redoc` | Auto-generated OpenAPI UI |

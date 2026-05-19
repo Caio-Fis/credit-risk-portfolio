@@ -68,7 +68,8 @@ Todo o `tasks/todo.md` (63 itens em 6 fases). Resumo do que está lá:
 ## Features de produto adiadas
 
 - [ ] **/portfolio — batch CSV upload** consumindo `POST /v1/predict/batch`. Para o usuário/analista subir uma planilha e ter score em massa.
-- [ ] **/monitor — dashboard live de drift** consumindo `GET /v1/monitor/drift/live` + `GET /v1/monitor/calibration`. Botão de recalibrate.
+- [x] **/monitor — dashboard live de drift** _(feito 2026-05-19)_ — consome `GET /v1/monitor/{drift,calibration,champion-vs-challenger,rolling-vs-frozen}` + `POST /v1/monitor/recalibrate`. 4 seções: drift events, calibração yearly (Brier raw/static/sliding), champion vs challenger (ARF AUROC/KS), rolling vs frozen (LGBM retreinado vs congelado em 2013). Bilingual PT/EN.
+- [x] **/insights — adaptive SHAP no front** _(feito 2026-05-19, novo)_ — rota dedicada para due-diligence: heatmap CSS-grid mês × feature (top-12), per-decile bars com low/mid/high, Ridge surrogate coefs over time com toggle de features. Consome novo `GET /v1/explain/adaptive-shap`.
 - [ ] **Domínio custom na Vercel** — está em `credit-risk-portfolio.vercel.app`. Se virar projeto real, comprar domínio.
 
 ---
