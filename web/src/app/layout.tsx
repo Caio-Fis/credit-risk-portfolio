@@ -17,10 +17,36 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 })
 
+const SITE_URL = "https://credit-risk-portfolio.vercel.app"
+const SITE_NAME = "Análise de Crédito"
+const SITE_TITLE = "Análise de Crédito — decisões em segundos"
+const SITE_DESCRIPTION =
+  "Análise de crédito explicável: risco em porcentagem e os motivos por trás de cada decisão. 10 anos de dados reais, < 1s por análise."
+
 export const metadata: Metadata = {
-  title: "Análise de Crédito — decisões em segundos",
-  description:
-    "Análise de crédito explicável: risco em porcentagem e os motivos por trás de cada decisão.",
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  authors: [{ name: "Caio-Fis", url: "https://github.com/Caio-Fis" }],
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    locale: "pt_BR",
+    alternateLocale: ["en_US"],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 }
 
 export default function RootLayout({
