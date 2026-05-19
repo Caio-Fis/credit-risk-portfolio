@@ -32,25 +32,58 @@ import {
   toCsvOutput,
   toJsonOutput,
   validateRows,
+  type CsvLocale,
   type ParsedCsv,
 } from "@/lib/csv-portfolio"
-import { useT } from "@/lib/i18n/provider"
+import { useLocale, useT } from "@/lib/i18n/provider"
 
 const MAX_ROWS = 10_000
+
+type RawParsed = {
+  rows: Record<string, string>[]
+  headers: string[]
+  fileName: string
+}
 
 type ParseState =
   | { status: "idle" }
   | { status: "parsing"; fileName: string }
-  | { status: "ready"; fileName: string; parsed: ParsedCsv }
+  | { status: "ready"; raw: RawParsed; parsed: ParsedCsv }
   | { status: "error"; fileName: string; reason: string }
 
 export default function PortfolioPage() {
   const t = useT()
+  const pageLocale = useLocale() as CsvLocale
+  const [csvLocale, setCsvLocale] = React.useState<CsvLocale>(pageLocale)
   const [parseState, setParseState] = React.useState<ParseState>({ status: "idle" })
   const [scored, setScored] = React.useState<{
     loans: LoanFeatures[]
     response: BatchPredictionResponse
   } | null>(null)
+
+  // Follow page language until the user explicitly picks a CSV locale.
+  const userOverrodeLocale = React.useRef(false)
+  React.useEffect(() => {
+    if (!userOverrodeLocale.current) setCsvLocale(pageLocale)
+  }, [pageLocale])
+
+  // Re-validate already-parsed rows when the CSV locale changes.
+  React.useEffect(() => {
+    if (parseState.status !== "ready") return
+    const reparsed = validateRows(
+      parseState.raw.rows,
+      parseState.raw.headers,
+      csvLocale,
+    )
+    setParseState({ status: "ready", raw: parseState.raw, parsed: reparsed })
+    setScored(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [csvLocale])
+
+  const handleLocaleChange = (l: CsvLocale) => {
+    userOverrodeLocale.current = true
+    setCsvLocale(l)
+  }
 
   const scoring = useMutation({
     mutationFn: async (loans: LoanFeatures[]) => {
@@ -66,10 +99,11 @@ export default function PortfolioPage() {
     setScored(null)
     try {
       const { rows } = await parseCsvFile(file)
+      const headers = rows.length > 0 ? Object.keys(rows[0]) : []
       if (rows.length === 0) {
         setParseState({
           status: "ready",
-          fileName: file.name,
+          raw: { rows, headers, fileName: file.name },
           parsed: {
             validLoans: [],
             invalidRows: [],
@@ -88,9 +122,12 @@ export default function PortfolioPage() {
         })
         return
       }
-      const headers = Object.keys(rows[0])
-      const parsed = validateRows(rows, headers)
-      setParseState({ status: "ready", fileName: file.name, parsed })
+      const parsed = validateRows(rows, headers, csvLocale)
+      setParseState({
+        status: "ready",
+        raw: { rows, headers, fileName: file.name },
+        parsed,
+      })
     } catch (err) {
       setParseState({
         status: "error",
@@ -101,7 +138,11 @@ export default function PortfolioPage() {
   }
 
   const handleTemplate = () => {
-    downloadString(sampleCsvTemplate(), "portfolio-template.csv", "text/csv")
+    downloadString(
+      sampleCsvTemplate(csvLocale),
+      `portfolio-template-${csvLocale}.csv`,
+      "text/csv",
+    )
   }
 
   const handleReset = () => {
@@ -120,7 +161,7 @@ export default function PortfolioPage() {
   const handleExportCsv = () => {
     if (!scored) return
     downloadString(
-      toCsvOutput(scored.loans, scored.response.predictions),
+      toCsvOutput(scored.loans, scored.response.predictions, csvLocale),
       "portfolio-scored.csv",
       "text/csv",
     )
@@ -157,9 +198,15 @@ export default function PortfolioPage() {
             onTemplateDownload={handleTemplate}
             onReset={parseState.status !== "idle" ? handleReset : undefined}
             fileName={
-              parseState.status !== "idle" ? parseState.fileName : undefined
+              parseState.status === "ready"
+                ? parseState.raw.fileName
+                : parseState.status === "parsing" || parseState.status === "error"
+                  ? parseState.fileName
+                  : undefined
             }
             busy={parseState.status === "parsing" || scoring.isPending}
+            locale={csvLocale}
+            onLocaleChange={handleLocaleChange}
           />
         </CardContent>
       </Card>

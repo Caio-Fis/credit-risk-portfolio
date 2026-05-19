@@ -4,6 +4,7 @@ import * as React from "react"
 import { DownloadIcon, FileSpreadsheetIcon, RotateCcwIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import type { CsvLocale } from "@/lib/csv-portfolio"
 import { useT } from "@/lib/i18n/provider"
 import { cn } from "@/lib/utils"
 
@@ -13,6 +14,8 @@ type Props = {
   onReset?: () => void
   fileName?: string
   busy?: boolean
+  locale: CsvLocale
+  onLocaleChange: (locale: CsvLocale) => void
 }
 
 export function UploadZone({
@@ -21,6 +24,8 @@ export function UploadZone({
   onReset,
   fileName,
   busy,
+  locale,
+  onLocaleChange,
 }: Props) {
   const t = useT()
   const inputRef = React.useRef<HTMLInputElement>(null)
@@ -37,6 +42,15 @@ export function UploadZone({
 
   return (
     <div className="space-y-4">
+      <LocaleToggle
+        locale={locale}
+        onChange={onLocaleChange}
+        label={t.portfolio.upload.localeLabel}
+        help={t.portfolio.upload.localeHelp}
+        enLabel={t.portfolio.upload.localeEnUs}
+        ptLabel={t.portfolio.upload.localePtBr}
+      />
+
       <div
         onDragOver={(e) => {
           e.preventDefault()
@@ -77,7 +91,6 @@ export function UploadZone({
           onChange={(e) => {
             const file = e.target.files?.[0]
             if (file) onFileSelected(file)
-            // reset value so re-selecting the same file fires onChange again
             e.target.value = ""
           }}
         />
@@ -99,5 +112,75 @@ export function UploadZone({
         )}
       </div>
     </div>
+  )
+}
+
+function LocaleToggle({
+  locale,
+  onChange,
+  label,
+  help,
+  enLabel,
+  ptLabel,
+}: {
+  locale: CsvLocale
+  onChange: (l: CsvLocale) => void
+  label: string
+  help: string
+  enLabel: string
+  ptLabel: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+          {label}
+        </span>
+        <div
+          role="radiogroup"
+          aria-label={label}
+          className="inline-flex overflow-hidden rounded-md border border-zinc-800 bg-zinc-900/60 text-xs"
+        >
+          <LocaleOption
+            active={locale === "en-US"}
+            onClick={() => onChange("en-US")}
+            label={enLabel}
+          />
+          <LocaleOption
+            active={locale === "pt-BR"}
+            onClick={() => onChange("pt-BR")}
+            label={ptLabel}
+          />
+        </div>
+      </div>
+      <p className="text-xs text-zinc-500">{help}</p>
+    </div>
+  )
+}
+
+function LocaleOption({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean
+  onClick: () => void
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      className={cn(
+        "px-3 py-1.5 transition-colors",
+        active
+          ? "bg-zinc-100 text-zinc-900"
+          : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
+      )}
+    >
+      {label}
+    </button>
   )
 }

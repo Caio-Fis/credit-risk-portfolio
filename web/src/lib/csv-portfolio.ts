@@ -3,6 +3,9 @@ import { z } from "zod"
 import type { LoanFeatures, PredictionResponse } from "./api"
 import { HOME_OWNERSHIPS, PURPOSES, US_STATES } from "./schemas"
 
+export type CsvLocale = "en-US" | "pt-BR"
+export const CSV_LOCALES: CsvLocale[] = ["en-US", "pt-BR"]
+
 export const REQUIRED_HEADERS = [
   "revenue",
   "dti_n",
@@ -19,108 +22,223 @@ export const OPTIONAL_HEADERS = ["emp_length", "issue_d"] as const
 
 export const ALL_HEADERS = [...REQUIRED_HEADERS, ...OPTIONAL_HEADERS] as const
 
+// ---------------------------------------------------------------------------
+// PT label maps — kept in sync with dict-pt.options.{purpose,homeOwnership}.
+// Keys are lowercased + diacritic-stripped to make matching case/accent insensitive.
+// ---------------------------------------------------------------------------
+const PURPOSE_PT_LABEL: Record<(typeof PURPOSES)[number], string> = {
+  debt_consolidation: "Consolidação de dívidas",
+  credit_card: "Cartão de crédito",
+  home_improvement: "Reforma de imóvel",
+  other: "Outro",
+  major_purchase: "Compra de valor alto",
+  medical: "Despesas médicas",
+  small_business: "Pequeno negócio",
+  car: "Automóvel",
+}
+
+const HOME_OWNERSHIP_PT_LABEL: Record<(typeof HOME_OWNERSHIPS)[number], string> = {
+  MORTGAGE: "Financiada",
+  RENT: "Alugada",
+  OWN: "Própria",
+  OTHER: "Outra",
+}
+
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "")
+}
+
+function normalizeKey(s: string): string {
+  return stripAccents(s.trim().toLowerCase())
+}
+
+const PURPOSE_LOOKUP: Record<string, (typeof PURPOSES)[number]> = (() => {
+  const m: Record<string, (typeof PURPOSES)[number]> = {}
+  for (const code of PURPOSES) {
+    m[normalizeKey(code)] = code
+    m[normalizeKey(PURPOSE_PT_LABEL[code])] = code
+  }
+  return m
+})()
+
+const HOME_OWNERSHIP_LOOKUP: Record<string, (typeof HOME_OWNERSHIPS)[number]> = (() => {
+  const m: Record<string, (typeof HOME_OWNERSHIPS)[number]> = {}
+  for (const code of HOME_OWNERSHIPS) {
+    m[normalizeKey(code)] = code
+    m[normalizeKey(HOME_OWNERSHIP_PT_LABEL[code])] = code
+  }
+  return m
+})()
+
+// ---------------------------------------------------------------------------
+// Coercion helpers
+// ---------------------------------------------------------------------------
 type CellMissing = "" | null | undefined
 
 const isMissing = (v: unknown): v is CellMissing =>
   v === undefined || v === null || (typeof v === "string" && v.trim() === "")
 
-const numberFromCell = z.preprocess((v) => {
-  if (isMissing(v)) return undefined
+function stripCurrencySymbols(s: string): string {
+  // Drops R$, $, %, and all whitespace (incl. NBSP)
+  return s.replace(/R\$|\$|%|\s| /g, "")
+}
+
+function coerceNumber(v: unknown, locale: CsvLocale): unknown {
   if (typeof v === "number") return v
-  const n = Number(String(v).trim().replace(/[,$%]/g, ""))
-  return Number.isFinite(n) ? n : v
-}, z.number())
-
-const nullableNumberFromCell = z.preprocess((v) => {
-  if (isMissing(v)) return null
-  if (typeof v === "number") return v
-  const n = Number(String(v).trim().replace(/[,$%]/g, ""))
-  return Number.isFinite(n) ? n : v
-}, z.number().nullable())
-
-const intFromCell = z.preprocess((v) => {
-  if (isMissing(v)) return undefined
-  if (typeof v === "number") return v
-  const trimmed = String(v).trim().toLowerCase()
-  if (trimmed === "true" || trimmed === "yes") return 1
-  if (trimmed === "false" || trimmed === "no") return 0
-  const n = Number(trimmed)
-  return Number.isFinite(n) ? n : v
-}, z.number().int())
-
-const trimString = z.preprocess((v) => {
-  if (isMissing(v)) return undefined
-  return typeof v === "string" ? v.trim() : v
-}, z.string())
-
-const upperTrimString = z.preprocess((v) => {
-  if (isMissing(v)) return undefined
-  return typeof v === "string" ? v.trim().toUpperCase() : v
-}, z.string())
-
-const issueDateFromCell = z.preprocess((v) => {
-  if (isMissing(v)) return null
   if (typeof v !== "string") return v
-  const trimmed = v.trim()
-  if (!trimmed) return null
-  // Accept YYYY-MM-DD or MM/DD/YYYY → normalize to YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
-  const us = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (us) {
-    const [, m, d, y] = us
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`
+  let s = stripCurrencySymbols(v)
+  if (s === "") return undefined
+  if (locale === "pt-BR") {
+    // Thousands: "." Decimal: ","
+    s = s.replaceAll(".", "")
+    s = s.replace(",", ".")
+  } else {
+    // Thousands: "," Decimal: "."
+    s = s.replaceAll(",", "")
   }
-  return trimmed
-}, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "issue_d: expected YYYY-MM-DD").nullable())
+  const n = Number(s)
+  return Number.isFinite(n) ? n : v
+}
 
-export const csvRowSchema = z.object({
-  revenue: numberFromCell.refine((n) => n >= 0, "revenue: must be ≥ 0"),
-  dti_n: numberFromCell.refine(
-    (n) => n >= 0 && n <= 999,
-    "dti_n: must be between 0 and 999",
-  ),
-  loan_amnt: numberFromCell.refine(
-    (n) => n >= 500 && n <= 40_000,
-    "loan_amnt: must be between 500 and 40000",
-  ),
-  fico_n: numberFromCell.refine(
-    (n) => n >= 300 && n <= 850,
-    "fico_n: must be between 300 and 850",
-  ),
-  experience_c: intFromCell.refine(
-    (n) => n === 0 || n === 1,
-    "experience_c: must be 0 or 1",
-  ),
-  emp_length: nullableNumberFromCell.refine(
-    (n) => n === null || (n >= 0 && n <= 10),
-    "emp_length: must be between 0 and 10 (or empty)",
-  ),
-  purpose: trimString.refine(
-    (s): s is (typeof PURPOSES)[number] =>
-      (PURPOSES as readonly string[]).includes(s),
-    `purpose: must be one of ${PURPOSES.join(", ")}`,
-  ),
-  home_ownership_n: upperTrimString.refine(
-    (s): s is (typeof HOME_OWNERSHIPS)[number] =>
-      (HOME_OWNERSHIPS as readonly string[]).includes(s),
-    `home_ownership_n: must be one of ${HOME_OWNERSHIPS.join(", ")}`,
-  ),
-  addr_state: upperTrimString.refine(
-    (s): s is (typeof US_STATES)[number] =>
-      (US_STATES as readonly string[]).includes(s),
-    "addr_state: must be a valid US two-letter state code",
-  ),
-  zip_code: trimString.refine(
-    (s) => /^[0-9]{3}[a-zA-Z0-9]{0,3}$/.test(s),
-    "zip_code: format '900xx' (3 digits + up to 3 chars)",
-  ),
-  issue_d: issueDateFromCell,
-})
+function coerceDate(v: unknown, locale: CsvLocale): unknown {
+  if (typeof v !== "string") return v
+  const s = v.trim()
+  if (!s) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (!m) return s
+  const [, a, b, y] = m
+  const [mo, da] = locale === "pt-BR" ? [b, a] : [a, b]
+  return `${y}-${mo.padStart(2, "0")}-${da.padStart(2, "0")}`
+}
 
-export type CsvLoanRow = z.infer<typeof csvRowSchema>
+function coerceExperience(v: unknown): unknown {
+  if (typeof v === "number") return v
+  if (typeof v !== "string") return v
+  const s = normalizeKey(v)
+  if (s === "") return undefined
+  if (s === "true" || s === "yes" || s === "y" || s === "sim" || s === "s") return 1
+  if (s === "false" || s === "no" || s === "n" || s === "nao") return 0
+  const n = Number(s)
+  return Number.isFinite(n) ? n : v
+}
+
+function coercePurpose(v: unknown): unknown {
+  if (typeof v !== "string") return v
+  const s = v.trim()
+  if (!s) return undefined
+  const hit = PURPOSE_LOOKUP[normalizeKey(s)]
+  return hit ?? s
+}
+
+function coerceHomeOwnership(v: unknown): unknown {
+  if (typeof v !== "string") return v
+  const s = v.trim()
+  if (!s) return undefined
+  const hit = HOME_OWNERSHIP_LOOKUP[normalizeKey(s)]
+  return hit ?? s
+}
+
+// ---------------------------------------------------------------------------
+// Locale-aware schema factory
+// ---------------------------------------------------------------------------
+export function makeCsvRowSchema(locale: CsvLocale) {
+  const numberFromCell = z.preprocess(
+    (v) => (isMissing(v) ? undefined : coerceNumber(v, locale)),
+    z.number(),
+  )
+  const nullableNumberFromCell = z.preprocess(
+    (v) => (isMissing(v) ? null : coerceNumber(v, locale)),
+    z.number().nullable(),
+  )
+  const intFromCell = z.preprocess(
+    (v) => (isMissing(v) ? undefined : coerceExperience(v)),
+    z.number().int(),
+  )
+  const dateFromCell = z.preprocess(
+    (v) => (isMissing(v) ? null : coerceDate(v, locale)),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "issue_d: expected YYYY-MM-DD or DD/MM/YYYY")
+      .nullable(),
+  )
+  const purposeFromCell = z.preprocess(
+    (v) => (isMissing(v) ? undefined : coercePurpose(v)),
+    z
+      .string()
+      .refine(
+        (s): s is (typeof PURPOSES)[number] =>
+          (PURPOSES as readonly string[]).includes(s),
+        `purpose: must be one of ${PURPOSES.join(", ")}`,
+      ),
+  )
+  const homeOwnershipFromCell = z.preprocess(
+    (v) => (isMissing(v) ? undefined : coerceHomeOwnership(v)),
+    z
+      .string()
+      .refine(
+        (s): s is (typeof HOME_OWNERSHIPS)[number] =>
+          (HOME_OWNERSHIPS as readonly string[]).includes(s),
+        `home_ownership_n: must be one of ${HOME_OWNERSHIPS.join(", ")}`,
+      ),
+  )
+  const stateFromCell = z.preprocess(
+    (v) => (isMissing(v) ? undefined : String(v).trim().toUpperCase()),
+    z
+      .string()
+      .refine(
+        (s): s is (typeof US_STATES)[number] =>
+          (US_STATES as readonly string[]).includes(s),
+        "addr_state: must be a valid US two-letter state code",
+      ),
+  )
+  const zipFromCell = z.preprocess(
+    (v) => (isMissing(v) ? undefined : String(v).trim()),
+    z
+      .string()
+      .refine(
+        (s) => /^[0-9]{3}[a-zA-Z0-9]{0,3}$/.test(s),
+        "zip_code: format '900xx' (3 digits + up to 3 chars)",
+      ),
+  )
+
+  return z.object({
+    revenue: numberFromCell.refine((n) => n >= 0, "revenue: must be ≥ 0"),
+    dti_n: numberFromCell.refine(
+      (n) => n >= 0 && n <= 999,
+      "dti_n: must be between 0 and 999",
+    ),
+    loan_amnt: numberFromCell.refine(
+      (n) => n >= 500 && n <= 40_000,
+      "loan_amnt: must be between 500 and 40000",
+    ),
+    fico_n: numberFromCell.refine(
+      (n) => n >= 300 && n <= 850,
+      "fico_n: must be between 300 and 850",
+    ),
+    experience_c: intFromCell.refine(
+      (n) => n === 0 || n === 1,
+      "experience_c: must be 0 or 1 (or Sim/Não, Yes/No)",
+    ),
+    emp_length: nullableNumberFromCell.refine(
+      (n) => n === null || (n >= 0 && n <= 10),
+      "emp_length: must be between 0 and 10 (or empty)",
+    ),
+    purpose: purposeFromCell,
+    home_ownership_n: homeOwnershipFromCell,
+    addr_state: stateFromCell,
+    zip_code: zipFromCell,
+    issue_d: dateFromCell,
+  })
+}
+
+/** Default-locale schema (en-US) kept for tests/back-compat. */
+export const csvRowSchema = makeCsvRowSchema("en-US")
+
+export type CsvLoanRow = z.infer<ReturnType<typeof makeCsvRowSchema>>
 
 export type CsvRowError = {
-  rowNumber: number // 1-based, matches CSV row excluding header
+  rowNumber: number // 1-based; 0 = global (header-level) issue
   reasons: string[]
 }
 
@@ -132,14 +250,14 @@ export type ParsedCsv = {
   unknownHeaders: string[]
 }
 
-/** Lazy-loaded papaparse — only pulled in when the user opens /portfolio. */
+// ---------------------------------------------------------------------------
+// CSV parsing (PapaParse — lazy-loaded)
+// ---------------------------------------------------------------------------
 async function getPapaparse() {
   const mod = await import("papaparse")
-  // papaparse ships both default and named (depending on bundler / version)
   return (mod as unknown as { default?: typeof import("papaparse") }).default ?? mod
 }
 
-/** Raw CSV → row dicts via PapaParse. Resolves once the file is fully parsed. */
 export async function parseCsvFile(
   file: File,
 ): Promise<{ rows: Record<string, string>[]; parseErrors: string[] }> {
@@ -149,6 +267,7 @@ export async function parseCsvFile(
       header: true,
       skipEmptyLines: true,
       transformHeader: (h: string) => h.trim(),
+      // delimiter omitted → PapaParse auto-detects ',', ';', '\t', '|'
       complete: (result) => {
         resolve({
           rows: result.data,
@@ -160,11 +279,12 @@ export async function parseCsvFile(
   })
 }
 
-/** Validate raw row dicts against the row schema. Returns valid loans + per-row errors. */
 export function validateRows(
   rows: Record<string, string>[],
   headers: string[],
+  locale: CsvLocale = "en-US",
 ): ParsedCsv {
+  const schema = makeCsvRowSchema(locale)
   const headerSet = new Set(headers.map((h) => h.trim()))
   const missingRequiredHeaders = REQUIRED_HEADERS.filter(
     (h) => !headerSet.has(h),
@@ -179,7 +299,6 @@ export function validateRows(
   rows.forEach((row, idx) => {
     const rowNumber = idx + 1
     if (missingRequiredHeaders.length > 0) {
-      // Fail fast — every row will be invalid for the same reason; report once.
       if (invalidRows.length === 0) {
         invalidRows.push({
           rowNumber: 0,
@@ -188,7 +307,7 @@ export function validateRows(
       }
       return
     }
-    const result = csvRowSchema.safeParse(row)
+    const result = schema.safeParse(row)
     if (result.success) {
       validLoans.push(rowToLoanFeatures(result.data))
     } else {
@@ -224,9 +343,59 @@ function rowToLoanFeatures(row: CsvLoanRow): LoanFeatures {
   }
 }
 
-/** CSV template content: header row + one realistic sample. */
-export function sampleCsvTemplate(): string {
-  const sampleValues: Record<(typeof ALL_HEADERS)[number], string | number> = {
+// ---------------------------------------------------------------------------
+// Locale-aware formatting for templates and exports
+// ---------------------------------------------------------------------------
+function delimiterFor(locale: CsvLocale): string {
+  // pt-BR Excel defaults to ';' because ',' is the decimal separator
+  return locale === "pt-BR" ? ";" : ","
+}
+
+function formatNumberForCsv(
+  v: number | null | undefined,
+  locale: CsvLocale,
+  decimals?: number,
+): string {
+  if (v === null || v === undefined) return ""
+  const fixed =
+    decimals !== undefined ? v.toFixed(decimals) : String(v)
+  if (locale === "pt-BR") return fixed.replace(".", ",")
+  return fixed
+}
+
+function formatDateForCsv(iso: string | null | undefined, locale: CsvLocale): string {
+  if (!iso) return ""
+  if (locale === "pt-BR") {
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`
+  }
+  return iso
+}
+
+function localizePurpose(code: string, locale: CsvLocale): string {
+  if (locale !== "pt-BR") return code
+  return PURPOSE_PT_LABEL[code as (typeof PURPOSES)[number]] ?? code
+}
+
+function localizeHomeOwnership(code: string, locale: CsvLocale): string {
+  if (locale !== "pt-BR") return code
+  return HOME_OWNERSHIP_PT_LABEL[code as (typeof HOME_OWNERSHIPS)[number]] ?? code
+}
+
+function csvCell(v: unknown, sep: string): string {
+  if (v === null || v === undefined) return ""
+  const s = String(v)
+  const needsQuote = s.includes(sep) || s.includes('"') || s.includes("\n")
+  if (needsQuote) return `"${s.replaceAll('"', '""')}"`
+  return s
+}
+
+// ---------------------------------------------------------------------------
+// Public output helpers
+// ---------------------------------------------------------------------------
+export function sampleCsvTemplate(locale: CsvLocale = "en-US"): string {
+  const sep = delimiterFor(locale)
+  const sample = {
     revenue: 65000,
     dti_n: 18.5,
     loan_amnt: 15000,
@@ -238,10 +407,30 @@ export function sampleCsvTemplate(): string {
     zip_code: "900xx",
     emp_length: 5,
     issue_d: "2017-06-01",
-  }
-  const header = ALL_HEADERS.join(",")
-  const row = ALL_HEADERS.map((h) => sampleValues[h]).join(",")
-  return `${header}\n${row}\n`
+  } satisfies Record<(typeof ALL_HEADERS)[number], string | number>
+
+  const header = ALL_HEADERS.join(sep)
+  const cells = ALL_HEADERS.map((h) => {
+    switch (h) {
+      case "revenue":
+      case "loan_amnt":
+      case "fico_n":
+      case "experience_c":
+        return formatNumberForCsv(sample[h] as number, locale)
+      case "dti_n":
+      case "emp_length":
+        return formatNumberForCsv(sample[h] as number, locale)
+      case "purpose":
+        return localizePurpose(sample[h] as string, locale)
+      case "home_ownership_n":
+        return localizeHomeOwnership(sample[h] as string, locale)
+      case "issue_d":
+        return formatDateForCsv(sample[h] as string, locale)
+      default:
+        return String(sample[h] ?? "")
+    }
+  })
+  return `${header}\n${cells.join(sep)}\n`
 }
 
 const CSV_OUT_HEADERS = [
@@ -254,53 +443,45 @@ const CSV_OUT_HEADERS = [
   "issue_d_used",
 ] as const
 
-function csvCell(v: unknown): string {
-  if (v === null || v === undefined) return ""
-  const s = String(v)
-  // Quote if contains comma, quote, or newline
-  if (/[",\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`
-  return s
-}
-
-/** Inputs + predictions → CSV string, row-aligned. */
 export function toCsvOutput(
   loans: LoanFeatures[],
   predictions: PredictionResponse[],
+  locale: CsvLocale = "en-US",
 ): string {
   if (loans.length !== predictions.length) {
     throw new Error(
       `loans (${loans.length}) and predictions (${predictions.length}) length mismatch`,
     )
   }
-  const lines = [CSV_OUT_HEADERS.join(",")]
+  const sep = delimiterFor(locale)
+  const lines = [CSV_OUT_HEADERS.map((h) => csvCell(h, sep)).join(sep)]
   for (let i = 0; i < loans.length; i++) {
     const loan = loans[i]
     const pred = predictions[i]
     const cells: string[] = [
-      csvCell(loan.revenue),
-      csvCell(loan.dti_n),
-      csvCell(loan.loan_amnt),
-      csvCell(loan.fico_n),
-      csvCell(loan.experience_c),
-      csvCell(loan.purpose),
-      csvCell(loan.home_ownership_n),
-      csvCell(loan.addr_state),
-      csvCell(loan.zip_code),
-      csvCell(loan.emp_length),
-      csvCell(loan.issue_d),
-      csvCell(pred.pd_calibrated.toFixed(6)),
-      csvCell(pred.pd_raw.toFixed(6)),
-      csvCell(pred.score_0_1000),
-      csvCell(pred.risk_band),
-      csvCell(pred.model_version),
-      csvCell(pred.issue_d_used),
+      csvCell(formatNumberForCsv(loan.revenue, locale), sep),
+      csvCell(formatNumberForCsv(loan.dti_n, locale), sep),
+      csvCell(formatNumberForCsv(loan.loan_amnt, locale), sep),
+      csvCell(formatNumberForCsv(loan.fico_n, locale), sep),
+      csvCell(formatNumberForCsv(loan.experience_c, locale), sep),
+      csvCell(localizePurpose(loan.purpose, locale), sep),
+      csvCell(localizeHomeOwnership(loan.home_ownership_n, locale), sep),
+      csvCell(loan.addr_state, sep),
+      csvCell(loan.zip_code, sep),
+      csvCell(formatNumberForCsv(loan.emp_length ?? null, locale), sep),
+      csvCell(formatDateForCsv(loan.issue_d ?? null, locale), sep),
+      csvCell(formatNumberForCsv(pred.pd_calibrated, locale, 6), sep),
+      csvCell(formatNumberForCsv(pred.pd_raw, locale, 6), sep),
+      csvCell(formatNumberForCsv(pred.score_0_1000, locale), sep),
+      csvCell(pred.risk_band, sep),
+      csvCell(pred.model_version, sep),
+      csvCell(formatDateForCsv(pred.issue_d_used, locale), sep),
     ]
-    lines.push(cells.join(","))
+    lines.push(cells.join(sep))
   }
   return lines.join("\n") + "\n"
 }
 
-/** JSON export: array of {input, prediction} pairs. */
 export function toJsonOutput(
   loans: LoanFeatures[],
   predictions: PredictionResponse[],
@@ -314,7 +495,6 @@ export function toJsonOutput(
   return JSON.stringify(pairs, null, 2)
 }
 
-/** Browser-side download trigger. No-op in SSR. */
 export function downloadString(
   content: string,
   filename: string,
@@ -332,7 +512,6 @@ export function downloadString(
   URL.revokeObjectURL(url)
 }
 
-/** Aggregate stats over a batch of predictions for the summary card. */
 export function summarizePredictions(predictions: PredictionResponse[]): {
   count: number
   meanPd: number

@@ -130,6 +130,11 @@ export const ptDict = {
       drop: "Arraste o CSV até aqui ou clique para escolher.",
       template: "Baixar modelo de CSV",
       reset: "Recomeçar",
+      localeLabel: "Formato dos dados",
+      localeEnUs: "Inglês (1,234.56 · MM/DD/YYYY)",
+      localePtBr: "Português (1.234,56 · DD/MM/YYYY)",
+      localeHelp:
+        "Define como o sistema lê números (vírgula vs. ponto), datas e termos como 'Financiada' ou 'MORTGAGE'. Default vem do idioma da página.",
     },
     parsing: "Lendo o arquivo…",
     validation: {

@@ -130,6 +130,11 @@ export const enDict: Dict = {
       drop: "Drop your CSV here or click to browse.",
       template: "Download CSV template",
       reset: "Start over",
+      localeLabel: "Data format",
+      localeEnUs: "English (1,234.56 · MM/DD/YYYY)",
+      localePtBr: "Portuguese (1.234,56 · DD/MM/YYYY)",
+      localeHelp:
+        "Controls how the parser reads numbers (comma vs. dot), dates and terms like 'Financiada' or 'MORTGAGE'. Default follows the page language.",
     },
     parsing: "Parsing file…",
     validation: {
