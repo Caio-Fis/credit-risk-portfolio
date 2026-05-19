@@ -6,30 +6,44 @@ Quando voltar: pegar uma seção por vez, não tentar tudo de uma vez.
 
 ---
 
-## Próximos passos (próxima sessão — 2026-05-19)
+## Próximos passos (atualizado 2026-05-19, fim do dia)
 
-Online Learning v2 está LIVE em produção (Vercel + HF Space). O que sobrou do escopo original e o que apareceu durante o deploy:
+Online Learning v2 está LIVE em produção (Vercel + HF Space).
 
-### Tier 1 — fechar o ciclo Online Learning v2 _(feito 2026-05-19)_
+**Estado atual:** 70 testes verdes, CI 3-jobs verde sem warnings, notebooks 12 + 13 reprodutíveis, smoke hermético do pipeline-lc, GitHub Actions já em runtime Node 24.
 
-- [x] **Notebooks 12 e 13** (Fase 7.4 do `todo.md`) — `12_online_learning.ipynb` (ARF + drift + champion vs challenger, com mini live demo via `stream_evaluate`) e `13_adaptive_shap.ipynb` (heatmap mês×feature + per-decile + Ridge surrogate + estabilidade cosseno). Source canônico em `notebooks/_build_notebooks.py` (rebuild idempotente).
+### Concluído nesta jornada
+
+#### Tier 1 — fechar o ciclo Online Learning v2 _(feito 2026-05-19)_
+
+- [x] **Notebooks 12 e 13** (Fase 7.4 do `todo.md`) — `12_online_learning.ipynb` (ARF + drift + champion vs challenger, com mini live demo via `stream_evaluate`) e `13_adaptive_shap.ipynb` (heatmap mês×feature + per-decile + Ridge surrogate + estabilidade cosseno). Source canônico em `notebooks/_build_notebooks.py` (rebuild idempotente — editar o .ipynb direto vai ser sobrescrito).
 - [x] **Testes unitários para `src/models/online_pd_model.py` e `src/explain/shap_adaptive.py`** (Fase 7.3) — `tests/test_online_pd.py` (11 testes, inclui label-delay regression e drift detector quiet-stream) + `tests/test_shap_adaptive.py` (7 testes com LGBM sintético tiny).
 - [x] **CI smoke test do pipeline online** (Fase 7.5) — `tests/test_pipeline_lc.py` (6 testes) + `make smoke-lc` + step explícito no `ci.yml`. Hermético: usa `data/processed/macro_features.parquet` commitado, sem download Zenodo.
 
-### Tier 2 — produto adiado
+#### Tier 3 (parcial) _(feito 2026-05-19, fim do dia)_
 
-- [ ] **`/portfolio` — batch CSV upload** consumindo `POST /v1/predict/batch`. Para o usuário/analista subir uma planilha e ter score em massa. Estimativa: ~4-6h.
-- [ ] **Domínio custom na Vercel** — está em `credit-risk-portfolio.vercel.app`. Se virar projeto real, comprar domínio.
+- [x] **GitHub Actions Node 24-compatible** — bump das 7 actions usadas (`actions/checkout@v6`, `actions/setup-python@v6`, `actions/upload-artifact@v7`, `astral-sh/setup-uv@v8.1.0`, `docker/setup-buildx-action@v4`, `docker/build-push-action@v7`, `docker/login-action@v4`). Gotcha: `setup-uv` não publica tag major flutuante; precisa pinnar `v8.1.0` (commits `9ed0988` + `04b47bd`).
 
-### Tier 3 — débito técnico de hoje
+### Próxima sessão — onde retomar
 
-- [ ] **Tracking de binários via Git LFS no repo do GitHub** — hoje `*.joblib`/`*.parquet`/`*.png` estão como blobs raw no GitHub. Funciona pra esse tamanho, mas se o joblib crescer (ex: ARF persistido) vai estourar limite. Considerar `git lfs migrate import --include="*.joblib,*.parquet,*.png" --everything`. **CUIDADO:** rewrite de história, força-push para `origin/master`. Não-bloqueante hoje, é higiene futura.
-- [ ] **README das três versões (root, web/, hf_space/)** — divergiram um pouco hoje (hf_space/README.md ainda lista 9 endpoints, deveria ter 17). Mecanismo automático ou manual de sincronização.
-- [ ] **Atualizar versões Node.js em GitHub Actions** — warnings de deprecação de Node 20 (forced para Node 24 em 2026-06-02). `astral-sh/setup-uv@v3`, `actions/checkout@v4`, etc. precisam upgrade.
+Ordem de prioridade. Pegar **uma** seção por vez.
 
-### Tier 4 — decisões arquiteturais
+#### Tier 2 — produto adiado
 
-- [ ] **Streamlit `app/`** — ainda usa o modelo antigo v1 Home Credit, mas o projeto pivotou pra LendingClub v2. Decidir: (a) aposentar Streamlit, (b) migrar pra v2 (duplica esforço com Next.js), (c) manter como "vitrine acadêmica" v1.
+- [ ] **`/portfolio` — batch CSV upload** consumindo `POST /v1/predict/batch`. Página nova no Next.js: input file → parse CSV no browser → POST → tabela de resultados + summary stats + export. **Estimativa: ~4-6h.**
+  - Backend já existe: `POST /v1/predict/batch` aceita `{"rows": [...]}` e devolve `{"predictions": [...]}`.
+  - Reaproveitar `web/src/lib/api.ts` para o client + componentes de validação que o `/origination` já tem.
+  - Decidir: parse client-side (papaparse) ou enviar arquivo cru? Pelo tamanho esperado, papaparse no browser basta.
+- [ ] **Domínio custom na Vercel** — está em `credit-risk-portfolio.vercel.app`. Comprar domínio só se virar projeto real.
+
+#### Tier 3 — débito técnico restante
+
+- [ ] **Tracking de binários via Git LFS** — hoje `*.joblib`/`*.parquet`/`*.png` (~50 MB total) são blobs raw no GitHub. Funciona, mas se o joblib crescer vai estourar limite. `git lfs migrate import --include="*.joblib,*.parquet,*.png" --everything`. **CUIDADO:** rewrite de história, force-push pra `origin/master`. Não-bloqueante.
+- [ ] **README das três versões (root, web/, hf_space/)** — `hf_space/README.md` ainda lista 9 endpoints quando hoje são 17. Idealmente um script `scripts/sync_readmes.py` que gera as 3 a partir de um template comum.
+
+#### Tier 4 — decisões arquiteturais
+
+- [ ] **Streamlit `app/`** — ainda usa o modelo antigo v1 Home Credit, mas o projeto pivotou pra LendingClub v2. Opções: (a) aposentar Streamlit, (b) migrar pra v2 (duplica esforço com Next.js), (c) manter como "vitrine acadêmica" v1. **Recomendação implícita:** (c) — o Streamlit ainda é um link no portfolio que mostra o v1 funcionando.
 - [ ] **CSVs em `data/processed/` versionados vs gerados** — hoje os 8 CSVs que back-eiam `/monitor` e `/insights` são commitados raw. Alternativa: gerar via `make pipeline-lc` em CI, salvar como GitHub Artifacts, baixar no build do Docker. Mais limpo mas mais frágil.
 
 ---
