@@ -2,6 +2,8 @@ import type { components } from "./api-types"
 
 export type LoanFeatures = components["schemas"]["LoanFeatures"]
 export type PredictionResponse = components["schemas"]["PredictionResponse"]
+export type BatchPredictionRequest = components["schemas"]["BatchPredictionRequest"]
+export type BatchPredictionResponse = components["schemas"]["BatchPredictionResponse"]
 export type ExplanationResponse = components["schemas"]["ExplanationResponse"]
 export type ModelInfoResponse = components["schemas"]["ModelInfoResponse"]
 export type DriftMonitorResponse = components["schemas"]["DriftMonitorResponse"]
@@ -46,6 +48,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+const BATCH_MAX = 1000
+
 export const api = {
   modelsInfo: () => request<ModelInfoResponse>("/v1/models/info"),
   predict: (loan: LoanFeatures) =>
@@ -53,6 +57,35 @@ export const api = {
       method: "POST",
       body: JSON.stringify(loan),
     }),
+  /**
+   * Score up to 1000 loans. For longer inputs the client chunks transparently
+   * and merges latency/n across calls.
+   */
+  predictBatch: async (
+    loans: LoanFeatures[],
+  ): Promise<BatchPredictionResponse> => {
+    if (loans.length === 0) {
+      return { predictions: [], n: 0, latency_ms: 0 }
+    }
+    if (loans.length <= BATCH_MAX) {
+      return request<BatchPredictionResponse>("/v1/predict/batch", {
+        method: "POST",
+        body: JSON.stringify({ loans }),
+      })
+    }
+    const merged: BatchPredictionResponse = { predictions: [], n: 0, latency_ms: 0 }
+    for (let i = 0; i < loans.length; i += BATCH_MAX) {
+      const chunk = loans.slice(i, i + BATCH_MAX)
+      const part = await request<BatchPredictionResponse>("/v1/predict/batch", {
+        method: "POST",
+        body: JSON.stringify({ loans: chunk }),
+      })
+      merged.predictions.push(...part.predictions)
+      merged.n += part.n
+      merged.latency_ms += part.latency_ms
+    }
+    return merged
+  },
   explain: (loan: LoanFeatures) =>
     request<ExplanationResponse>("/v1/explain", {
       method: "POST",

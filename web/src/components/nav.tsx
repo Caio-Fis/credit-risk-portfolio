@@ -14,6 +14,7 @@ export function Nav() {
   const links = [
     { href: "/", label: t.nav.home },
     { href: "/origination", label: t.nav.analyze },
+    { href: "/portfolio", label: t.nav.portfolio },
     { href: "/monitor", label: t.nav.monitor },
     { href: "/insights", label: t.nav.insights },
   ]

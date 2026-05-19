@@ -30,10 +30,15 @@ Ordem de prioridade. Pegar **uma** seção por vez.
 
 #### Tier 2 — produto adiado
 
-- [ ] **`/portfolio` — batch CSV upload** consumindo `POST /v1/predict/batch`. Página nova no Next.js: input file → parse CSV no browser → POST → tabela de resultados + summary stats + export. **Estimativa: ~4-6h.**
-  - Backend já existe: `POST /v1/predict/batch` aceita `{"rows": [...]}` e devolve `{"predictions": [...]}`.
-  - Reaproveitar `web/src/lib/api.ts` para o client + componentes de validação que o `/origination` já tem.
-  - Decidir: parse client-side (papaparse) ou enviar arquivo cru? Pelo tamanho esperado, papaparse no browser basta.
+- [x] **`/portfolio` — batch CSV upload** _(feito 2026-05-19, segunda jornada)_ — rota Next.js consumindo `POST /v1/predict/batch`:
+  - `web/src/lib/csv-portfolio.ts`: parse via PapaParse (dynamic import — bundle só carrega em `/portfolio`), zod row schema com coerção de strings/`$`/`%`/`MM/DD/YYYY`, `validateRows()` retorna `{validLoans, invalidRows, missing/unknown headers}`, `toCsvOutput/toJsonOutput/sampleCsvTemplate/downloadString`.
+  - `web/src/lib/api.ts`: novo `api.predictBatch()` com chunking automático (BATCH_MAX=1000 server-side, MAX_ROWS=10 000 client-side).
+  - Página `web/src/app/portfolio/page.tsx`: três cards (Upload / Validação / Resultado), banner contextual (ok/warn/error/info), tabela paginada (50/pág), summary com barra de distribuição por band, exports CSV e JSON.
+  - Componentes em `web/src/components/portfolio/{upload-zone, errors-list, results-table, summary-stats}.tsx`.
+  - Bloqueia submit em linhas inválidas (decisão do dia): mostra cada linha problemática com motivos.
+  - i18n PT/EN: novo bloco `portfolio.*` + entrada `nav.portfolio` em ambos os dicts.
+  - Tests: `csv-portfolio.test.ts` com 20 cenários (parsing strict, coerção $/`,`, MM/DD, missing headers, unknown headers, export CSV quoting, JSON shape, mismatch lengths). 55 testes verdes no total.
+  - Smoke: build ✓ (rota estática `/portfolio` registrada), dev server ✓, backend live `/v1/predict/batch` confirmado com 2 loans (latência 20 ms).
 - [ ] **Domínio custom na Vercel** — está em `credit-risk-portfolio.vercel.app`. Comprar domínio só se virar projeto real.
 
 #### Tier 3 — débito técnico restante

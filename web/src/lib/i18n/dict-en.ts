@@ -12,6 +12,7 @@ export const enDict: Dict = {
     home: "Home",
     analyze: "Analyze",
     advanced: "Advanced view",
+    portfolio: "Portfolio",
     monitor: "Monitor",
     insights: "Insights",
     toggleTo: "PT",
@@ -115,6 +116,69 @@ export const enDict: Dict = {
       title: "Want more than the number?",
       body: "See exactly how much each input weighed in the decision, the economic context, and the raw scores — ready for audit.",
       cta: "Open detailed analysis",
+    },
+  },
+
+  portfolio: {
+    title: "Score a portfolio",
+    subtitle:
+      "Upload a CSV of loans and get the calibrated risk for each one. Useful to review vintages, simulate scenarios, or audit historical batches.",
+    upload: {
+      heading: "1. Upload CSV",
+      sub: "Expected headers: revenue, dti_n, loan_amnt, fico_n, experience_c, purpose, home_ownership_n, addr_state, zip_code. Optional: emp_length, issue_d. Limit: 10,000 rows per upload.",
+      cta: "Choose file",
+      drop: "Drop your CSV here or click to browse.",
+      template: "Download CSV template",
+      reset: "Start over",
+    },
+    parsing: "Parsing file…",
+    validation: {
+      heading: "2. Validation",
+      ok: (n: number) => `${n} rows ready to score.`,
+      mixed: (valid: number, invalid: number) =>
+        `${valid} valid rows and ${invalid} with issues. Fix the CSV and try again.`,
+      missingHeaders: (headers: string) =>
+        `Missing required columns: ${headers}.`,
+      unknownHeaders: (headers: string) =>
+        `Ignored columns (not in schema): ${headers}.`,
+      noRows: "The CSV has no data rows.",
+      submit: "Score portfolio",
+      submitting: "Scoring…",
+      submitError: "Couldn't score the portfolio. Try again.",
+    },
+    errorsList: {
+      heading: "Rows with issues",
+      rowLabel: (n: number) => `Row ${n}`,
+      rowHeader: "Header",
+      empty: "No issues found.",
+    },
+    results: {
+      heading: "3. Results",
+      sub: (n: number, latency: string) =>
+        `${n} loans scored in ${latency}.`,
+      exportCsv: "Export CSV",
+      exportJson: "Export JSON",
+      table: {
+        row: "#",
+        loan: "Loan",
+        fico: "FICO",
+        amount: "Amount",
+        purpose: "Purpose",
+        state: "State",
+        pd: "Calibrated PD",
+        score: "Score (0–1000)",
+        band: "Band",
+      },
+    },
+    summary: {
+      heading: "Portfolio summary",
+      count: "Loans",
+      meanPd: "Mean PD",
+      band: "Risk band distribution",
+    },
+    empty: {
+      title: "No portfolio scored yet",
+      body: "Upload a CSV to get the calibrated risk per loan, the risk-band distribution and an export-ready output.",
     },
   },
 

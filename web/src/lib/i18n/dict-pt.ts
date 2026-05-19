@@ -12,6 +12,7 @@ export const ptDict = {
     home: "Início",
     analyze: "Analisar",
     advanced: "Modo avançado",
+    portfolio: "Portfólio",
     monitor: "Monitor",
     insights: "Insights",
     toggleTo: "EN",
@@ -115,6 +116,69 @@ export const ptDict = {
       title: "Quer ir além do número?",
       body: "Veja a contribuição exata de cada dado para a decisão, o contexto econômico considerado e a pontuação bruta — pronto para auditoria.",
       cta: "Abrir análise detalhada",
+    },
+  },
+
+  portfolio: {
+    title: "Analisar uma carteira",
+    subtitle:
+      "Suba um CSV de empréstimos e receba o risco calibrado para cada um. Útil para revisar safras, simular cenários ou auditar lotes históricos.",
+    upload: {
+      heading: "1. Subir CSV",
+      sub: "Cabeçalhos esperados: revenue, dti_n, loan_amnt, fico_n, experience_c, purpose, home_ownership_n, addr_state, zip_code. Opcionais: emp_length, issue_d. Limite por carga: 10.000 linhas.",
+      cta: "Selecionar arquivo",
+      drop: "Arraste o CSV até aqui ou clique para escolher.",
+      template: "Baixar modelo de CSV",
+      reset: "Recomeçar",
+    },
+    parsing: "Lendo o arquivo…",
+    validation: {
+      heading: "2. Validação",
+      ok: (n: number) => `${n} linhas prontas para análise.`,
+      mixed: (valid: number, invalid: number) =>
+        `${valid} linhas válidas e ${invalid} com problema. Corrija o CSV e tente de novo.`,
+      missingHeaders: (headers: string) =>
+        `Faltam colunas obrigatórias: ${headers}.`,
+      unknownHeaders: (headers: string) =>
+        `Colunas ignoradas (fora do schema): ${headers}.`,
+      noRows: "O CSV não tem linhas de dados.",
+      submit: "Analisar carteira",
+      submitting: "Analisando…",
+      submitError: "Não foi possível analisar a carteira. Tente novamente.",
+    },
+    errorsList: {
+      heading: "Linhas com problema",
+      rowLabel: (n: number) => `Linha ${n}`,
+      rowHeader: "Cabeçalho",
+      empty: "Nenhum problema encontrado.",
+    },
+    results: {
+      heading: "3. Resultado",
+      sub: (n: number, latency: string) =>
+        `${n} empréstimos analisados em ${latency}.`,
+      exportCsv: "Exportar CSV",
+      exportJson: "Exportar JSON",
+      table: {
+        row: "#",
+        loan: "Empréstimo",
+        fico: "FICO",
+        amount: "Valor",
+        purpose: "Finalidade",
+        state: "UF",
+        pd: "PD calibrada",
+        score: "Score (0–1000)",
+        band: "Faixa",
+      },
+    },
+    summary: {
+      heading: "Resumo da carteira",
+      count: "Empréstimos",
+      meanPd: "PD média",
+      band: "Distribuição por faixa de risco",
+    },
+    empty: {
+      title: "Sem carteira analisada ainda",
+      body: "Suba um CSV para ver o risco calibrado por empréstimo, a distribuição por faixa e exportar o resultado.",
     },
   },
 
