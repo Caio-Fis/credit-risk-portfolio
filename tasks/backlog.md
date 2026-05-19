@@ -29,8 +29,14 @@ Quando voltar: pegar uma seção por vez, não tentar tudo de uma vez.
   - Desktop: Performance 57 (curvas mais apertadas), LCP 2.4s, TBT 600ms
   - **Veredito sobre blur/gradients**: NÃO são o gargalo. São static + low-alpha + pointer-events-none, custo de paint <5ms. Manter como estão.
   - **Gargalo real**: JS execution. Chunk `043wleu_f8edf.js` (196 KB) tem 83% código não usado na landing — provavelmente recharts/radix sendo arrastado pra rota errada. Fix está fora do escopo "polish" mas vale como follow-up.
-  - **Fixes aplicados**: A11y `color-contrast` (zinc-500 → zinc-400 em footer, page.tsx, trust-signals, lang-toggle) e `label-content-name-mismatch` (lang-toggle aria-label trocado por sr-only span).
+  - **Fixes aplicados**: A11y `color-contrast` (zinc-500 → zinc-400 em footer, page.tsx, trust-signals, lang-toggle, step numbers do HowItWorks) e `label-content-name-mismatch` (lang-toggle aria-label trocado por sr-only span). A11y final: **96 → 100**.
   - Reports salvos temporariamente em `/tmp/lh-mobile.json` e `/tmp/lh-desktop.json` (não commitados).
+
+- [x] **JS bundle audit + code-split** _(feito 2026-05-19, follow-up do Lighthouse)_ — duas fontes de waste corrigidas:
+  - `Toaster` (`sonner`) vivia no `app/layout.tsx`, então toda rota incluía sonner + next-themes mesmo sem chamar `toast()`. Movido pras duas únicas páginas que tostam (`/origination` e `/explain`). next-themes inteiro removido como dependência (o wrapper só pegava o tema via `useTheme()` que ficava em `"system"` ignorado, já que o html é forçadamente `dark`). Theme passou a ser hardcoded.
+  - `ShapWaterfall` puxava `recharts` (~700 KB) por import estático dentro de `risk-details.tsx`, que é usado por ambas as rotas — mas o waterfall só renderiza quando `showTechnical && explanation` (i.e. /explain). Trocado por `next/dynamic` com `ssr: false`. Mesma coisa no import direto em `explain/page.tsx`.
+  - **Resultado mensurado**: landing total-byte-weight **535 → 414 KiB** (Lighthouse mobile, local prod build); a11y 96 → **100**; LCP local 2.5s.
+  - **TBT continua alto** (~4.1s mobile). Isso é custo de framework runtime (Next 16 + React 19 + Turbopack), não código nosso. Fica fora de escopo até voltar a virar gargalo.
 
 - [x] **Frontend tests** _(feito 2026-05-19)_ — Vitest + RTL + jsdom configurados. 29 testes / 4 arquivos:
   - `src/lib/feature-labels.test.ts`: `humanizeKey`, `getFeatureLabel` PT+EN + fallback, `formatFeatureValue` para USD/pct/anos/etc.
