@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google"
 
 import { Footer } from "@/components/footer"
 import { Nav } from "@/components/nav"
-import { Toaster } from "@/components/ui/sonner"
 import { Providers } from "@/lib/providers"
 import "./globals.css"
 
@@ -73,7 +72,6 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
-          <Toaster theme="dark" />
         </Providers>
       </body>
     </html>

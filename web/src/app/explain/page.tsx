@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useMutation } from "@tanstack/react-query"
 import { LightbulbIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -7,7 +8,15 @@ import { toast } from "sonner"
 import { LoanWizard } from "@/components/loan-wizard"
 import { RiskDetails } from "@/components/risk-details"
 import { RiskNarrative } from "@/components/risk-narrative"
-import { ShapWaterfall } from "@/components/shap-waterfall"
+
+// Lazy-load recharts (~700 KB) — only on this page.
+const ShapWaterfall = dynamic(
+  () =>
+    import("@/components/shap-waterfall").then((m) => ({
+      default: m.ShapWaterfall,
+    })),
+  { ssr: false },
+)
 import {
   Card,
   CardContent,
@@ -16,6 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Toaster } from "@/components/ui/sonner"
 import {
   formatFeatureValue,
   getFeatureSpec,
@@ -175,6 +185,7 @@ export default function ExplainPage() {
           </div>
         </div>
       )}
+      <Toaster />
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { LoanWizard } from "@/components/loan-wizard"
 import { RiskDetails } from "@/components/risk-details"
 import { RiskGauge } from "@/components/risk-gauge"
 import { RiskNarrative } from "@/components/risk-narrative"
+import { Toaster } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -95,6 +96,7 @@ export default function OriginationPage() {
           </>
         )}
       </div>
+      <Toaster />
     </div>
   )
 }
