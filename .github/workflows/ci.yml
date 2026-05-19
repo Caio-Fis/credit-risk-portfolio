@@ -94,18 +94,55 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
 
-      - name: Push to Space
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install huggingface_hub
+        run: pip install --quiet "huggingface_hub[hf_xet]>=0.27"
+
+      - name: Upload to Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_USER: ${{ secrets.HF_USER }}
           HF_SPACE: ${{ secrets.HF_SPACE }}   # e.g. credit-risk-api
         if: env.HF_TOKEN != '' && env.HF_USER != '' && env.HF_SPACE != ''
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote add space "https://${HF_USER}:${HF_TOKEN}@huggingface.co/spaces/${HF_USER}/${HF_SPACE}"
-          git push --force space HEAD:main
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = f"{os.environ['HF_USER']}/{os.environ['HF_SPACE']}"
+          sha = os.environ.get("GITHUB_SHA", "manual")[:12]
+
+          # Binaries (model joblib, parquet, png) go through Xet automatically
+          # via the hf_xet extra. Web frontend, notebooks, and other non-runtime
+          # files are excluded to keep the Space lean.
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              commit_message=f"sync: {sha} from credit-risk-portfolio",
+              ignore_patterns=[
+                  ".git/**",
+                  ".github/**",
+                  ".vscode/**",
+                  "web/**",
+                  "notebooks/**",
+                  "mlruns/**",
+                  "logs/**",
+                  "tasks/**",
+                  "docs/**",
+                  "tests/**",
+                  "**/__pycache__/**",
+                  "**/.pytest_cache/**",
+                  "**/.ruff_cache/**",
+                  "**/.ipynb_checkpoints/**",
+                  "data/raw/**",
+              ],
+              delete_patterns=["**"],  # remove files in Space not present locally
+          )
+          PY
