@@ -197,6 +197,88 @@ class RecalibrationTriggerResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Champion vs challenger (ARF replay)
+# ---------------------------------------------------------------------------
+class ChampionChallengerYearly(BaseModel):
+    year: int
+    n_test: int
+    base_rate_test: float
+    auroc: float
+    ks: float
+    brier: float
+    calib_slope: float
+
+
+class ChampionChallengerResponse(BaseModel):
+    yearly: list[ChampionChallengerYearly]
+    summary: dict[str, float] = Field(
+        description="Mean AUROC/KS/Brier across years for the ARF challenger replay."
+    )
+    note: str = Field(
+        description="Editorial note: ARF underperforms the LightGBM champion on this dataset (~0.54 vs ~0.65 AUROC). Kept as drift detector, not primary model."
+    )
+    source: str
+
+
+# ---------------------------------------------------------------------------
+# Rolling vs frozen baseline (LightGBM retrained yearly vs frozen 2013)
+# ---------------------------------------------------------------------------
+class RollingOOTYearly(BaseModel):
+    year: int
+    n_test: int
+    auroc: float
+    ks: float
+    brier: float
+    calib_slope: float
+
+
+class RollingVsFrozenResponse(BaseModel):
+    rolling: list[RollingOOTYearly] = Field(description="LightGBM retrained yearly, evaluated on next year.")
+    frozen: list[RollingOOTYearly] = Field(description="LightGBM frozen at 2013 cut, evaluated on later years.")
+    summary: dict[str, float] = Field(description="Mean uplift of rolling over frozen (AUROC, KS, Brier).")
+    source: dict[str, str]
+
+
+# ---------------------------------------------------------------------------
+# Adaptive SHAP (offline-computed: heatmap + per-decile + ridge surrogate)
+# ---------------------------------------------------------------------------
+class ShapHeatmapCell(BaseModel):
+    month: str = Field(description="YYYY-MM bucket.")
+    feature: str
+    mean_abs_shap: float
+
+
+class ShapDecileCell(BaseModel):
+    decile: int = Field(ge=0, le=9, description="Risk decile (0 = lowest predicted PD, 9 = highest).")
+    feature: str
+    mean_abs_shap: float
+
+
+class RidgeCoefRow(BaseModel):
+    month: str
+    coefs: dict[str, float]
+
+
+class AdaptiveShapResponse(BaseModel):
+    heatmap: list[ShapHeatmapCell] = Field(
+        description="Mean |SHAP| per (month, feature). Background rebased monthly."
+    )
+    by_decile: list[ShapDecileCell] = Field(
+        description="Per-decile SHAP attribution for the latest scoring window."
+    )
+    ridge_surrogate: list[RidgeCoefRow] = Field(
+        description="Monthly incremental Ridge surrogate coefficients in logit space."
+    )
+    top_features: list[str] = Field(description="Top features by overall mean |SHAP|.")
+    months: list[str] = Field(description="Sorted month buckets present in the heatmap.")
+    deciles: list[int] = Field(description="Sorted deciles present in by_decile.")
+    references: list[str] = Field(
+        default_factory=list,
+        description="Papers/methods this surface replicates.",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Error
 # ---------------------------------------------------------------------------
 class ErrorResponse(BaseModel):

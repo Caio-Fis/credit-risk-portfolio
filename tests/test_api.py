@@ -162,3 +162,53 @@ async def test_metrics_endpoint_exposes_prometheus(client):
     body = r.text
     assert "credit_risk_requests_total" in body
     assert "credit_risk_predictions_total" in body
+
+
+@pytest.mark.asyncio
+async def test_champion_vs_challenger_returns_yearly(client):
+    r = await client.get("/v1/monitor/champion-vs-challenger")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["yearly"]) >= 5
+    row = body["yearly"][0]
+    for key in ("year", "n_test", "auroc", "ks", "brier", "calib_slope"):
+        assert key in row
+    for key in ("auroc_mean", "ks_mean", "brier_mean", "years_covered"):
+        assert key in body["summary"]
+    assert "ARF" in body["note"]
+
+
+@pytest.mark.asyncio
+async def test_rolling_vs_frozen_overlap_summary(client):
+    r = await client.get("/v1/monitor/rolling-vs-frozen")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["rolling"], "rolling list must not be empty"
+    assert body["frozen"], "frozen list must not be empty"
+    for key in ("auroc_uplift_pp", "ks_uplift_pp", "brier_delta_pp", "years_overlap"):
+        assert key in body["summary"]
+    # Rolling beats frozen on the overlap: positive AUROC uplift expected
+    assert body["summary"]["auroc_uplift_pp"] > 0
+    assert body["summary"]["years_overlap"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_adaptive_shap_surfaces_present(client):
+    r = await client.get("/v1/explain/adaptive-shap")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["heatmap"], "heatmap must not be empty"
+    assert body["by_decile"], "by_decile must not be empty"
+    assert body["ridge_surrogate"], "ridge_surrogate must not be empty"
+    assert 5 <= len(body["top_features"]) <= 12
+    # Heatmap cells only reference top features
+    feats = set(body["top_features"])
+    assert {cell["feature"] for cell in body["heatmap"]}.issubset(feats)
+    # Months are sorted
+    months = body["months"]
+    assert months == sorted(months)
+    # Deciles are 0..9-ish
+    assert all(0 <= d <= 9 for d in body["deciles"])
+    # Surrogate rows carry coefficient dicts
+    assert isinstance(body["ridge_surrogate"][0]["coefs"], dict)
+    assert "fico_n" in body["ridge_surrogate"][0]["coefs"] or len(body["ridge_surrogate"][0]["coefs"]) > 0
