@@ -58,6 +58,9 @@ data/processed/arf_predictions_lc.parquet
 # Claude Code local settings / state
 .claude/
 
+# Notas pessoais de sessão (backlog, todo, lições, redesigns) — só local
+tasks/
+
 # Logs
 logs/
 
