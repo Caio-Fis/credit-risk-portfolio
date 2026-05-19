@@ -6,6 +6,34 @@ Quando voltar: pegar uma seção por vez, não tentar tudo de uma vez.
 
 ---
 
+## Próximos passos (próxima sessão — 2026-05-19)
+
+Online Learning v2 está LIVE em produção (Vercel + HF Space). O que sobrou do escopo original e o que apareceu durante o deploy:
+
+### Tier 1 — fechar o ciclo Online Learning v2
+
+- [ ] **Notebooks 12 e 13** (Fase 7.4 do `todo.md`) — `12_online_learning.ipynb` (ARF + drift + champion vs challenger) e `13_adaptive_shap.ipynb` (rebaselined SHAP + per-decile + Ridge surrogate) para reprodutibilidade. ~3-4h.
+- [ ] **Testes unitários para `src/models/online_pd_model.py` e `src/explain/shap_adaptive.py`** (Fase 7.3) — a sessão de hoje cobriu só a API. ~2-3h.
+- [ ] **CI smoke test do pipeline online** (Fase 7.5) — atualmente CI só roda testes unitários; adicionar um smoke que valida `make pipeline-lc` em sample reduzido. ~1-2h.
+
+### Tier 2 — produto adiado
+
+- [ ] **`/portfolio` — batch CSV upload** consumindo `POST /v1/predict/batch`. Para o usuário/analista subir uma planilha e ter score em massa. Estimativa: ~4-6h.
+- [ ] **Domínio custom na Vercel** — está em `credit-risk-portfolio.vercel.app`. Se virar projeto real, comprar domínio.
+
+### Tier 3 — débito técnico de hoje
+
+- [ ] **Tracking de binários via Git LFS no repo do GitHub** — hoje `*.joblib`/`*.parquet`/`*.png` estão como blobs raw no GitHub. Funciona pra esse tamanho, mas se o joblib crescer (ex: ARF persistido) vai estourar limite. Considerar `git lfs migrate import --include="*.joblib,*.parquet,*.png" --everything`. **CUIDADO:** rewrite de história, força-push para `origin/master`. Não-bloqueante hoje, é higiene futura.
+- [ ] **README das três versões (root, web/, hf_space/)** — divergiram um pouco hoje (hf_space/README.md ainda lista 9 endpoints, deveria ter 17). Mecanismo automático ou manual de sincronização.
+- [ ] **Atualizar versões Node.js em GitHub Actions** — warnings de deprecação de Node 20 (forced para Node 24 em 2026-06-02). `astral-sh/setup-uv@v3`, `actions/checkout@v4`, etc. precisam upgrade.
+
+### Tier 4 — decisões arquiteturais
+
+- [ ] **Streamlit `app/`** — ainda usa o modelo antigo v1 Home Credit, mas o projeto pivotou pra LendingClub v2. Decidir: (a) aposentar Streamlit, (b) migrar pra v2 (duplica esforço com Next.js), (c) manter como "vitrine acadêmica" v1.
+- [ ] **CSVs em `data/processed/` versionados vs gerados** — hoje os 8 CSVs que back-eiam `/monitor` e `/insights` são commitados raw. Alternativa: gerar via `make pipeline-lc` em CI, salvar como GitHub Artifacts, baixar no build do Docker. Mais limpo mas mais frágil.
+
+---
+
 ## Front — quick polish
 
 - [x] **OG / Twitter / favicon próprio** _(feito 2026-05-19)_ — gerados via file-conventions do Next 16 em vez de PNG estáticos:
