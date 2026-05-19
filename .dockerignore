@@ -30,11 +30,9 @@ data/processed/frozen_lgbm_predictions_lc.parquet
 data/processed/oos_predictions_lc.parquet
 data/processed/oos_predictions.parquet
 data/processed/arf_predictions_lc.parquet
-data/processed/ridge_surrogate_coefs.csv
-data/processed/adaptive_shap_*.csv
-data/processed/rolling_oot_lc.csv
-data/processed/frozen_oot_lc.csv
-data/processed/arf_yearly_lc.csv
+# ridge_surrogate_coefs.csv, adaptive_shap_*.csv, rolling_oot_lc.csv,
+# frozen_oot_lc.csv and arf_yearly_lc.csv stay in the build context — they
+# back /v1/monitor/* and /v1/explain/adaptive-shap.
 mlruns
 mlartifacts
 
