@@ -144,7 +144,7 @@ function HowItWorks() {
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-zinc-400 ring-1 ring-zinc-800">
                     <Icon className="size-4" />
                   </span>
-                  <span className="text-xs font-mono text-zinc-600">
+                  <span className="text-xs font-mono text-zinc-400">
                     0{i + 1}
                   </span>
                 </div>
