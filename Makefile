@@ -1,5 +1,5 @@
 .PHONY: data features train tune evaluate pipeline app test lint install \
-        data-lc features-lc pipeline-lc
+        data-lc features-lc pipeline-lc smoke-lc
 
 install:
 	uv sync --all-extras
@@ -30,6 +30,11 @@ features-lc:
 	uv run python -m src.features.lendingclub_features
 
 pipeline-lc: data-lc features-lc
+
+# Hermetic smoke for the LC pipeline: synthetic 15-col frame + committed FRED
+# cache, ~1s. Catches schema regressions without downloading the 167 MB CSV.
+smoke-lc:
+	uv run pytest tests/test_pipeline_lc.py -v
 
 # ---- v3 API (FastAPI service) ----
 api-dev:

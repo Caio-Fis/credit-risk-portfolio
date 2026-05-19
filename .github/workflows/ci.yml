@@ -30,6 +30,9 @@ jobs:
       - name: Test (unit + API smoke)
         run: uv run pytest tests/ -v --tb=short --cov=src --cov-report=term-missing --cov-report=xml
 
+      - name: Pipeline smoke (LendingClub features + FRED merge, no download)
+        run: make smoke-lc
+
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4

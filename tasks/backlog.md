@@ -10,11 +10,11 @@ Quando voltar: pegar uma seção por vez, não tentar tudo de uma vez.
 
 Online Learning v2 está LIVE em produção (Vercel + HF Space). O que sobrou do escopo original e o que apareceu durante o deploy:
 
-### Tier 1 — fechar o ciclo Online Learning v2
+### Tier 1 — fechar o ciclo Online Learning v2 _(feito 2026-05-19)_
 
-- [ ] **Notebooks 12 e 13** (Fase 7.4 do `todo.md`) — `12_online_learning.ipynb` (ARF + drift + champion vs challenger) e `13_adaptive_shap.ipynb` (rebaselined SHAP + per-decile + Ridge surrogate) para reprodutibilidade. ~3-4h.
-- [ ] **Testes unitários para `src/models/online_pd_model.py` e `src/explain/shap_adaptive.py`** (Fase 7.3) — a sessão de hoje cobriu só a API. ~2-3h.
-- [ ] **CI smoke test do pipeline online** (Fase 7.5) — atualmente CI só roda testes unitários; adicionar um smoke que valida `make pipeline-lc` em sample reduzido. ~1-2h.
+- [x] **Notebooks 12 e 13** (Fase 7.4 do `todo.md`) — `12_online_learning.ipynb` (ARF + drift + champion vs challenger, com mini live demo via `stream_evaluate`) e `13_adaptive_shap.ipynb` (heatmap mês×feature + per-decile + Ridge surrogate + estabilidade cosseno). Source canônico em `notebooks/_build_notebooks.py` (rebuild idempotente).
+- [x] **Testes unitários para `src/models/online_pd_model.py` e `src/explain/shap_adaptive.py`** (Fase 7.3) — `tests/test_online_pd.py` (11 testes, inclui label-delay regression e drift detector quiet-stream) + `tests/test_shap_adaptive.py` (7 testes com LGBM sintético tiny).
+- [x] **CI smoke test do pipeline online** (Fase 7.5) — `tests/test_pipeline_lc.py` (6 testes) + `make smoke-lc` + step explícito no `ci.yml`. Hermético: usa `data/processed/macro_features.parquet` commitado, sem download Zenodo.
 
 ### Tier 2 — produto adiado
 
