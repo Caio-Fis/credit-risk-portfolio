@@ -181,6 +181,21 @@ export const ptDict = {
       meanPd: "PD média",
       band: "Distribuição por faixa de risco",
     },
+    vintage: {
+      title: "Análise por safra",
+      sub: "Empréstimos agrupados pelo mês em que foram concedidos. As barras mostram quantos empréstimos caíram em cada faixa de risco; a linha roxa mostra a PD média da safra. Útil pra ver se a qualidade da carteira melhorou ou piorou ao longo do tempo.",
+      granularity: {
+        label: "Agrupar por",
+        auto: "Auto",
+        month: "Mês",
+        quarter: "Trimestre",
+        year: "Ano",
+      },
+      worstLabel: "Pior safra",
+      bestLabel: "Melhor safra",
+      meanPdLegend: "PD média",
+      empty: "Sem dados suficientes para análise por safra.",
+    },
     empty: {
       title: "Sem carteira analisada ainda",
       body: "Suba um CSV para ver o risco calibrado por empréstimo, a distribuição por faixa e exportar o resultado.",

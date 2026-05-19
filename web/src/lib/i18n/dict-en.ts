@@ -181,6 +181,21 @@ export const enDict: Dict = {
       meanPd: "Mean PD",
       band: "Risk band distribution",
     },
+    vintage: {
+      title: "Vintage analysis",
+      sub: "Loans grouped by the period they were originated. Bars show how many loans fell into each risk band; the purple line is the average PD for that vintage. Useful to see whether portfolio quality is improving or deteriorating over time.",
+      granularity: {
+        label: "Group by",
+        auto: "Auto",
+        month: "Month",
+        quarter: "Quarter",
+        year: "Year",
+      },
+      worstLabel: "Worst vintage",
+      bestLabel: "Best vintage",
+      meanPdLegend: "Mean PD",
+      empty: "Not enough data for vintage analysis.",
+    },
     empty: {
       title: "No portfolio scored yet",
       body: "Upload a CSV to get the calibrated risk per loan, the risk-band distribution and an export-ready output.",

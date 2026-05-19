@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 import { useMutation } from "@tanstack/react-query"
 import {
   AlertTriangleIcon,
@@ -22,6 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Toaster } from "@/components/ui/sonner"
 import { api, type BatchPredictionResponse, type LoanFeatures } from "@/lib/api"
 import {
@@ -36,6 +38,23 @@ import {
   type ParsedCsv,
 } from "@/lib/csv-portfolio"
 import { useLocale, useT } from "@/lib/i18n/provider"
+import { cn } from "@/lib/utils"
+import {
+  bucketByVintage,
+  extremeVintages,
+  formatPeriodLabel,
+  resolveGranularity,
+  type Granularity,
+  type ResolvedGranularity,
+} from "@/lib/vintage"
+
+const VintageChart = dynamic(
+  () =>
+    import("@/components/portfolio/vintage-chart").then((m) => ({
+      default: m.VintageChart,
+    })),
+  { ssr: false, loading: () => <Skeleton className="h-[320px] w-full" /> },
+)
 
 const MAX_ROWS = 10_000
 
@@ -364,6 +383,7 @@ function ResultsSection({
           meanPd={summary.meanPd}
           byBand={summary.byBand}
         />
+        <VintageSection predictions={response.predictions} />
         <ResultsTable loans={loans} predictions={response.predictions} />
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={onExportCsv}>
@@ -377,6 +397,165 @@ function ResultsSection({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function VintageSection({
+  predictions,
+}: {
+  predictions: BatchPredictionResponse["predictions"]
+}) {
+  const t = useT()
+  const locale = useLocale()
+  const [granularity, setGranularity] = React.useState<Granularity>("auto")
+
+  const resolved: ResolvedGranularity = React.useMemo(
+    () => resolveGranularity(predictions, granularity),
+    [predictions, granularity],
+  )
+  const buckets = React.useMemo(
+    () => bucketByVintage(predictions, resolved),
+    [predictions, resolved],
+  )
+  const { worst, best } = React.useMemo(() => extremeVintages(buckets), [buckets])
+
+  if (predictions.length === 0) return null
+
+  return (
+    <section className="space-y-3 rounded-lg border border-zinc-800/70 bg-zinc-900/30 p-4">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-3xl space-y-1">
+          <h3 className="text-sm font-semibold text-zinc-100">
+            {t.portfolio.vintage.title}
+          </h3>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            {t.portfolio.vintage.sub}
+          </p>
+        </div>
+        <GranularityToggle value={granularity} onChange={setGranularity} />
+      </header>
+
+      {buckets.length < 2 ? (
+        <p className="text-xs text-zinc-500">{t.portfolio.vintage.empty}</p>
+      ) : (
+        <>
+          <VintageChart
+            buckets={buckets}
+            granularity={resolved}
+            locale={locale}
+          />
+          {worst && best && worst.period !== best.period && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <VintageKpi
+                label={t.portfolio.vintage.worstLabel}
+                period={formatPeriodLabel(worst.period, resolved, locale)}
+                pd={worst.meanPd}
+                n={worst.n}
+                tone="bad"
+              />
+              <VintageKpi
+                label={t.portfolio.vintage.bestLabel}
+                period={formatPeriodLabel(best.period, resolved, locale)}
+                pd={best.meanPd}
+                n={best.n}
+                tone="good"
+              />
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+function GranularityToggle({
+  value,
+  onChange,
+}: {
+  value: Granularity
+  onChange: (g: Granularity) => void
+}) {
+  const t = useT()
+  const opts: { v: Granularity; label: string }[] = [
+    { v: "auto", label: t.portfolio.vintage.granularity.auto },
+    { v: "month", label: t.portfolio.vintage.granularity.month },
+    { v: "quarter", label: t.portfolio.vintage.granularity.quarter },
+    { v: "year", label: t.portfolio.vintage.granularity.year },
+  ]
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[11px] uppercase tracking-wider text-zinc-500">
+        {t.portfolio.vintage.granularity.label}
+      </span>
+      <div
+        role="radiogroup"
+        aria-label={t.portfolio.vintage.granularity.label}
+        className="inline-flex overflow-hidden rounded-md border border-zinc-800 bg-zinc-900/60 text-xs"
+      >
+        {opts.map((o) => {
+          const active = value === o.v
+          return (
+            <button
+              key={o.v}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(o.v)}
+              className={cn(
+                "px-2.5 py-1 transition-colors",
+                active
+                  ? "bg-zinc-100 text-zinc-900"
+                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
+              )}
+            >
+              {o.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function VintageKpi({
+  label,
+  period,
+  pd,
+  n,
+  tone,
+}: {
+  label: string
+  period: string
+  pd: number
+  n: number
+  tone: "good" | "bad"
+}) {
+  const t = useT()
+  const toneClass =
+    tone === "bad"
+      ? "border-red-500/30 bg-red-500/5"
+      : "border-emerald-500/30 bg-emerald-500/5"
+  const valueClass = tone === "bad" ? "text-red-300" : "text-emerald-300"
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between rounded-lg border px-4 py-3",
+        toneClass,
+      )}
+    >
+      <div>
+        <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+          {label}
+        </p>
+        <p className="mt-0.5 text-sm font-medium text-zinc-200">{period}</p>
+        <p className="text-[11px] text-zinc-500">
+          {n} {t.portfolio.summary.count.toLowerCase()}
+        </p>
+      </div>
+      <p className={cn("font-mono text-2xl tabular-nums", valueClass)}>
+        {(pd * 100).toFixed(1)}%
+      </p>
+    </div>
   )
 }
 
