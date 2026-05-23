@@ -8,11 +8,19 @@ Stack: **Next.js 16 (App Router) · TypeScript · Tailwind v4 · shadcn/ui ·
 
 ## Rotas
 
-| Path | Endpoint consumido | UI |
+Tabela regenerada por `scripts/sync_readmes.py` (no root do repo) a partir
+de `web/src/app/**/page.tsx`.
+
+<!-- AUTO:frontend-routes -->
+| Path | UI | API consumed |
 |---|---|---|
-| `/` | `GET /v1/models/info` | Landing com métricas OOT |
-| `/origination` | `POST /v1/predict` | Form 11 campos → PD calibrada + risk band + macro snapshot |
-| `/explain` | `POST /v1/explain` | Form → SHAP waterfall horizontal + top 5 drivers |
+| `/` | Landing — bilingual PT/EN, static marketing | — |
+| `/explain` | Advanced view — SHAP waterfall + macro context | `POST /v1/predict` · `POST /v1/explain` |
+| `/insights` | Due-diligence — adaptive SHAP heatmap (month × feature), per-decile attribution, Ridge surrogate | `GET /v1/explain/adaptive-shap` |
+| `/monitor` | Risk & ops — drift timeline, calibration trend, retraining uplift, champion vs challenger | `GET /v1/monitor/{drift,calibration,champion-vs-challenger,rolling-vs-frozen}` · `POST /v1/monitor/recalibrate` |
+| `/origination` | Analyst wizard with plain-English narrative | `POST /v1/predict` · `POST /v1/explain` |
+| `/portfolio` | Batch CSV upload (en-US / pt-BR) + vintage analysis | `POST /v1/predict/batch` |
+<!-- /AUTO:frontend-routes -->
 
 ## Dev
 
@@ -52,9 +60,3 @@ npm run build && npm start           # serve em :3000
 
 Como a API tem `allow_origins=["*"]` (ver `src/api/settings.py`),
 chamadas browser-side do domínio Vercel funcionam sem mudança no backend.
-
-## Próximos passos (out-of-scope do MVP)
-
-- `/portfolio` — upload CSV → `POST /v1/predict/batch`
-- `/monitor` — dashboard live com `GET /v1/monitor/drift/live` + `GET /v1/monitor/calibration`
-- Botão de recalibrate (`POST /v1/monitor/recalibrate`)
